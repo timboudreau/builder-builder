@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.mastfrog</groupId>
+        <artifactId>builder-builder-parent</artifactId>
+        <version>1.0.0</version>
+    </parent>
+    <groupId>com.mastfrog.builder.test</groupId>
+    <artifactId>builder-test</artifactId>
+    <properties>
+        <exec.mainClass>com.mastfrog.builder.test.BuilderTest</exec.mainClass>
+        <java.source.level>11</java.source.level>
+    </properties>
+    <dependencies>
+        <dependency>
+            <groupId>com.mastfrog</groupId>
+            <artifactId>builder-annotations</artifactId>
+            <version>${project.version}</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.mastfrog</groupId>
+            <artifactId>builder-api</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.mastfrog</groupId>
+            <artifactId>builder-annotation-processors</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+    </dependencies>
+    <build>
+        <plugins>
+            <plugin>
+                <!-- NetBeans 6.9+ requires JDK 6 -->
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <!-- If we use 3.x compiler each project will need individually specified
+                annotationProcessorPaths including all modules whose annotations
+                it consumes, or we'd need maven.compiler.force.javac=true, which brings
+                build speed to a crawl.  This is something Maven has not gotten very right.
+                -->
+                <version>3.10.0</version>
+                <configuration>
+                    <source>${java.source.level}</source>
+                    <target>${java.source.level}</target>
+                    <showDeprecation>true</showDeprecation>
+                    <showWarnings>true</showWarnings>
+                    <encoding>UTF-8</encoding>
+                    <verbose>true</verbose>
+                    <!--<maven.compiler.force.javac>true</maven.compiler.force.javac>-->
+                    <annotationProcessorPaths>
+                        <dependency>
+                            <groupId>com.mastfrog</groupId>
+                            <artifactId>builder-annotation-processors</artifactId>
+                            <version>${project.version}</version>
+                        </dependency>
+                    </annotationProcessorPaths>
+                    <annotationProcessors>com.mastfrog.builder.annotation.processors.BuilderAnnotationProcessor</annotationProcessors>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>
