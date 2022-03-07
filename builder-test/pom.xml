@@ -11,13 +11,14 @@
     <properties>
         <exec.mainClass>com.mastfrog.builder.test.BuilderTest</exec.mainClass>
         <java.source.level>11</java.source.level>
+        <endorsed.dir>${project.build.directory}/generated-sources/annotations</endorsed.dir>
     </properties>
     <dependencies>
         <dependency>
             <groupId>com.mastfrog</groupId>
             <artifactId>builder-annotations</artifactId>
             <version>${project.version}</version>
-            <scope>compile</scope>
+            <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>com.mastfrog</groupId>
@@ -28,19 +29,33 @@
             <groupId>com.mastfrog</groupId>
             <artifactId>builder-annotation-processors</artifactId>
             <version>${project.version}</version>
+            <scope>provided</scope>
         </dependency>
     </dependencies>
     <build>
         <plugins>
+            <!--            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>build-helper-maven-plugin</artifactId>
+                <version>3.1.0</version>
+                <executions>
+                    <execution>
+                        <id>add-source</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>add-source</goal>
+                        </goals>
+                        <configuration>
+                            <sources>
+                                <source>${project.build.directory}/generated-sources/annotations</source>
+                            </sources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>            -->
             <plugin>
-                <!-- NetBeans 6.9+ requires JDK 6 -->
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <!-- If we use 3.x compiler each project will need individually specified
-                annotationProcessorPaths including all modules whose annotations
-                it consumes, or we'd need maven.compiler.force.javac=true, which brings
-                build speed to a crawl.  This is something Maven has not gotten very right.
-                -->
                 <version>3.10.0</version>
                 <configuration>
                     <source>${java.source.level}</source>
@@ -50,16 +65,49 @@
                     <encoding>UTF-8</encoding>
                     <verbose>true</verbose>
                     <!--<maven.compiler.force.javac>true</maven.compiler.force.javac>-->
-                    <annotationProcessorPaths>
+                    
+                    <!--                    <annotationProcessorPaths>
                         <dependency>
                             <groupId>com.mastfrog</groupId>
                             <artifactId>builder-annotation-processors</artifactId>
                             <version>${project.version}</version>
                         </dependency>
                     </annotationProcessorPaths>
-                    <annotationProcessors>com.mastfrog.builder.annotation.processors.BuilderAnnotationProcessor</annotationProcessors>
+                    <annotationProcessors>com.mastfrog.builder.annotation.processors.BuilderAnnotationProcessor</annotationProcessors>-->
+                    
+                    <configuration>
+                        <compilerArgument>-proc:none</compilerArgument>        
+                    </configuration>                    
                 </configuration>
             </plugin>
+            
+<!--            <plugin>
+                <groupId>org.bsc.maven</groupId>
+                <artifactId>maven-processor-plugin</artifactId>
+                <version>4.5</version>
+                <executions>
+                    <execution>
+                        <id>process</id>
+                        <goals>
+                            <goal>process</goal>
+                        </goals>
+                        <phase>generate-sources</phase>
+                        <configuration>
+                            <processors>
+                                <processor>com.mastfrog.builder.annotation.processors.BuilderAnnotationProcessor</processor>
+                            </processors>
+                            <defaultOutputDirectory>${project.build.directory}/generated-sources/annotations/</defaultOutputDirectory>
+                        </configuration>
+                    </execution>
+                </executions>
+                <dependencies>
+                    <dependency>
+                        <groupId>com.mastfrog</groupId>
+                        <artifactId>builder-annotation-processors</artifactId>
+                        <version>${project.version}</version>
+                    </dependency>
+                </dependencies>
+            </plugin>-->
         </plugins>
     </build>
 </project>

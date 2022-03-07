@@ -24,7 +24,6 @@
 package com.mastfrog.builder.annotation.processors;
 
 import com.mastfrog.annotation.AnnotationUtils;
-import com.mastfrog.annotation.processor.AbstractDelegatingProcessor;
 import com.mastfrog.builder.annotation.processors.BuilderDescriptors.BuilderDescriptor;
 import com.mastfrog.builder.annotation.processors.spi.ConstraintGenerator;
 import com.mastfrog.util.service.ServiceProvider;
@@ -33,8 +32,6 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.Set;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.annotation.processing.Processor;
@@ -60,7 +57,7 @@ public class BuilderAnnotationProcessor extends AbstractProcessor {
     private BuilderDescriptors descs;
     private ConstraintHandlers handlers;
     static final String ANNO = "com.mastfrog.builder.annotations.GenerateBuilder";
-    static final String NULLABLE = "com.mastfrog.builder.annotations.BuilderNullable";
+    static final String NULLABLE = "com.mastfrog.builder.annotations.Nullable";
 
     static {
         AnnotationUtils.forceLogging();
@@ -106,7 +103,7 @@ public class BuilderAnnotationProcessor extends AbstractProcessor {
             ExecutableElement ex = (ExecutableElement) el;
             String name = ex.getSimpleName().toString();
             for (VariableElement param : ex.getParameters()) {
-                AnnotationMirror nullableMirror = utils.findAnnotationMirror(el, NULLABLE);
+                AnnotationMirror nullableMirror = utils.findAnnotationMirror(param, NULLABLE);
                 String fieldName = param.getSimpleName().toString();
                 handleOneParameter(desc, el, fieldName, nullableMirror != null, param);
             }
@@ -115,6 +112,7 @@ public class BuilderAnnotationProcessor extends AbstractProcessor {
 
     void handleOneParameter(BuilderDescriptor bd, Element target, String fieldName, boolean optional, VariableElement on) {
         Set<ConstraintGenerator> gen = handlers.generators(target, on);
+        System.out.println("PARAM " + fieldName + " OPTIONAL " + optional);
         bd.handleOneParameter(fieldName, optional, on, gen);
     }
 

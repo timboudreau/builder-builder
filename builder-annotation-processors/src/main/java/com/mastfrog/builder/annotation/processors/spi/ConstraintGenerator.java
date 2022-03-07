@@ -36,7 +36,15 @@ public interface ConstraintGenerator {
 
     public static final String NULLABLE_ANNOTATION = "com.mastfrog.builder.annotations.Nullable";
 
-    void generate(String fieldVariableName, String problemsListVariableName, AnnotationUtils utils, ClassBuilder.BlockBuilderBase<?, ?, ?> into);
+    default <T, B extends ClassBuilder.BlockBuilderBase<T, B, X>, X> void generate(
+            String fieldVariableName, String problemsListVariableName,
+            AnnotationUtils utils, B into) {
+        generate(fieldVariableName, problemsListVariableName, "add", utils, into);
+    }
+
+    <T, B extends ClassBuilder.BlockBuilderBase<T, B, X>, X> void generate(String fieldVariableName,
+            String problemsListVariableName, String addMethodName, AnnotationUtils utils,
+            B into);
 
     default <C> void decorateClass(ClassBuilder<C> bldr) {
     }

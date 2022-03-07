@@ -33,8 +33,6 @@ public class BuilderTest {
     public static void main(String[] args) {
         System.out.println("Hello World!");
 //
-//        new ComplexThingBuilder().withName("Glarg")
-//                .build();
 
     }
 }

@@ -85,12 +85,13 @@ public class ByteMinMaxHandler implements ConstraintHandler {
         }
 
         @Override
-        public void generate(String fieldVariableName, String problemsListVariableName,
-                AnnotationUtils utils,
-                ClassBuilder.BlockBuilderBase<?, ?, ?> bb) {
+        public <T, B extends ClassBuilder.BlockBuilderBase<T, B, X>, X> void
+                generate(String fieldVariableName, String problemsListVariableName,
+                        String addMethodName, AnnotationUtils utils,
+                        B bb) {
             bb.lineComment(getClass().getName());
             bb.iff().value().expression(fieldVariableName).isGreaterThan(max)
-                    .invoke("add")
+                    .invoke(addMethodName)
                     .withStringConcatentationArgument(fieldVariableName)
                     .append(" must be less than or equal to ")
                     .append(max)
@@ -126,16 +127,10 @@ public class ByteMinMaxHandler implements ConstraintHandler {
         }
 
         @Override
-        public void generate(String fieldVariableName, String problemsListVariableName,
-                AnnotationUtils utils,
-                ClassBuilder.BlockBuilderBase<?, ?, ?> bb) {
+        public <T, B extends ClassBuilder.BlockBuilderBase<T, B, X>, X> void generate(String fieldVariableName, String problemsListVariableName,
+                String addMethodName, AnnotationUtils utils,
+                B bb) {
             bb.lineComment(getClass().getName());
-            _generate(fieldVariableName, problemsListVariableName, utils, bb);
-        }
-
-        private <T, B extends ClassBuilder.BlockBuilderBase<T, B, X>, X> void _generate(String fieldVariableName, String problemsListVariableName,
-                AnnotationUtils utils,
-                ClassBuilder.BlockBuilderBase<T, B, X> bb) {
             ClassBuilder.ValueExpressionBuilder<ClassBuilder.ComparisonBuilder<ClassBuilder.IfBuilder<B>>> ifb = bb
                     .iff().value();
             if (nullable) {
@@ -144,7 +139,7 @@ public class ByteMinMaxHandler implements ConstraintHandler {
             }
             ifb.expression(fieldVariableName)
                     .isLessThan(min)
-                    .invoke("add")
+                    .invoke(addMethodName)
                     .withStringConcatentationArgument(fieldVariableName)
                     .append(" must be greater than or equal to ")
                     .append(min)

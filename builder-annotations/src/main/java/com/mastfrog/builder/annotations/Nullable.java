@@ -29,6 +29,9 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import java.lang.annotation.Target;
 
 /**
+ * Marks a parameter used in generating a builder as optional. The generated
+ * builder may still not accept being <i>passed</i> to a setter on it, but it
+ * will not prevent building the builder without ever calling a setter for it.
  *
  * @author Tim Boudreau
  */

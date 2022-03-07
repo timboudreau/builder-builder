@@ -26,6 +26,7 @@ package com.mastfrog.builder.test;
 import java.util.Set;
 import com.mastfrog.builder.annotations.GenerateBuilder;
 import com.mastfrog.builder.annotations.Nullable;
+import com.mastfrog.builder.annotations.constraint.DoubleMax;
 import com.mastfrog.builder.annotations.constraint.DoubleMin;
 import com.mastfrog.builder.annotations.constraint.FloatMax;
 import com.mastfrog.builder.annotations.constraint.FloatMin;
@@ -49,10 +50,10 @@ public class ComplexThing {
 
     @GenerateBuilder
     public ComplexThing(@IntMin(23) @IntMax(52) int id,
-            @StringPattern(value = "^[A-Z][a-zA-Z0-9]+$", minLength = 3, maxLength = 24) String name,
-            @Nullable @LongMax(51424280634L) long when,
+            @Nullable @StringPattern(value = "^[A-Z][a-zA-Z0-9]+$", minLength = 3, maxLength = 24) String name,
+            @LongMax(51424280634L) long when,
             @FloatMin(1.5F) @FloatMax(2.5F) float weight,
-            @Nullable Set<String> contents,
+            Set<String> contents,
             @Nullable OtherThing other,
             boolean isPretty) {
         this.id = id;
@@ -63,8 +64,13 @@ public class ComplexThing {
         this.other = other;
     }
 
+    @Override
+    public String toString() {
+        return "ComplexThing{" + "id=" + id + ", name=" + name + ", when=" + when + ", weight=" + weight + ", contents=" + contents + ", other=" + other + '}';
+    }
+
     @GenerateBuilder
-    public Whoozit whoozit(@IntMax(23) int value, @DoubleMin(1) double fraction) {
+    public Whoozit whoozit(@IntMax(23) int value, @DoubleMax(1) @DoubleMin(0) double fraction) {
         return new Whoozit(name, value, fraction, this);
     }
 

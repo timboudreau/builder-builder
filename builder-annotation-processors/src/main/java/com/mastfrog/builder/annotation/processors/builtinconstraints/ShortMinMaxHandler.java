@@ -81,11 +81,13 @@ public class ShortMinMaxHandler implements ConstraintHandler {
         }
 
         @Override
-        public void generate(String fieldVariableName, String problemsListVariableName, AnnotationUtils utils,
-                ClassBuilder.BlockBuilderBase<?, ?, ?> bb) {
+        public <T, B extends ClassBuilder.BlockBuilderBase<T, B, X>, X> void generate(String
+                fieldVariableName, String problemsListVariableName,
+                String addMethodName, AnnotationUtils utils,
+                B bb) {
             bb.lineComment(getClass().getName());
             bb.iff().value().expression(fieldVariableName).isGreaterThan(max)
-                    .invoke("add")
+                    .invoke(addMethodName)
                     .withStringConcatentationArgument(fieldVariableName)
                     .append(" must be less than or equal to ").append(max).endConcatenation().on(problemsListVariableName)
                     .endIf();
@@ -111,13 +113,14 @@ public class ShortMinMaxHandler implements ConstraintHandler {
         }
 
         @Override
-        public void generate(String fieldVariableName, String problemsListVariableName,
-                AnnotationUtils utils,
-                ClassBuilder.BlockBuilderBase<?, ?, ?> bb) {
+        public <T, B extends ClassBuilder.BlockBuilderBase<T, B, X>, X> void generate(
+                String fieldVariableName, String problemsListVariableName,
+                String addMethodName, AnnotationUtils utils,
+                B bb) {
             bb.iff().value()
                     .expression(fieldVariableName)
                     .isLessThan(min)
-                    .invoke("add")
+                    .invoke(addMethodName)
                     .withStringConcatentationArgument(fieldVariableName)
                     .append(" must be greater than or equal to ")
                     .append(min)

@@ -1,7 +1,7 @@
 /*
  * The MIT License
  *
- * Copyright 2020 Mastfrog Technologies.
+ * Copyright 2022 Mastfrog Technologies.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -21,42 +21,25 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-package com.mastfrog.builder.annotations;
 
-import static java.lang.annotation.ElementType.CONSTRUCTOR;
-import static java.lang.annotation.ElementType.METHOD;
-import java.lang.annotation.Retention;
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
-import java.lang.annotation.Target;
-
+package com.mastfrog.builder.test.blah;
+import com.mastfrog.builder.test.ComplexThing;
+import com.mastfrog.builder.test.ComplexThing.OtherThing;
+import com.mastfrog.builder.test.ComplexThingBuilder;
+import java.util.Collections;
 /**
  *
  * @author Tim Boudreau
  */
-@Retention(RUNTIME)
-@Target({CONSTRUCTOR, METHOD})
-public @interface GenerateBuilder {
+public class BT {
 
-    /**
-     * The name of the generated builder.
-     *
-     * @return A class name
-     */
-    String className() default "";
-
-    /**
-     * The set of style flags that affect code generationl.
-     *
-     * @return
-     */
-    BuilderStyles[] styles() default {BuilderStyles.CLOSURES};
-
-    /**
-     * If this library evolves in ways that generate code that would be
-     * incompatible with a previous version, specify the version of this library
-     * code generation should adhere to.
-     *
-     * @return an integer
-     */
-    int codeGenerationVersion() default 1;
+    public static void main(String[] args) {
+        ComplexThingBuilder ctb = new ComplexThingBuilder();
+        ComplexThing x = ctb.withName("Pooger").withId(23).withIsPretty(true)
+                .withContents(Collections.emptySet())
+                .withOther(new OtherThing("foo"))
+                .withWhen(5)
+                .buildWithWeight(5F);
+        System.out.println("Have an x " + x);
+    }
 }

@@ -25,6 +25,7 @@ package com.mastfrog.builder.annotation.processors.builtinconstraints;
 
 import com.mastfrog.annotation.AnnotationUtils;
 import com.mastfrog.builder.annotation.processors.spi.ConstraintGenerator;
+import static com.mastfrog.builder.annotation.processors.spi.ConstraintGenerator.NULLABLE_ANNOTATION;
 import com.mastfrog.builder.annotation.processors.spi.ConstraintHandler;
 import com.mastfrog.java.vogon.ClassBuilder;
 import com.mastfrog.util.service.ServiceProvider;
@@ -48,7 +49,8 @@ public class StringPatternHandler implements ConstraintHandler {
     public void collect(AnnotationUtils utils, Element targetElement, VariableElement parameterElement, Consumer<ConstraintGenerator> genConsumer) {
         AnnotationMirror mir = utils.findAnnotationMirror(parameterElement, STRING_PATTERN);
         if (mir != null) {
-            genConsumer.accept(new StringPatternConstraintGenerator(utils, parameterElement, mir));
+            boolean nullable = utils.findAnnotationMirror(parameterElement, NULLABLE_ANNOTATION) != null;
+            genConsumer.accept(new StringPatternConstraintGenerator(utils, parameterElement, mir, nullable));
         }
     }
 
@@ -58,8 +60,9 @@ public class StringPatternHandler implements ConstraintHandler {
         private final int minLength;
         private final int maxLength;
         private final String varName;
+        private final boolean nullable;
 
-        StringPatternConstraintGenerator(AnnotationUtils utils, VariableElement ve, AnnotationMirror mir) {
+        StringPatternConstraintGenerator(AnnotationUtils utils, VariableElement ve, AnnotationMirror mir, boolean nullable) {
             this.varName = ve.getSimpleName().toString();
             String pat = utils.annotationValue(mir, "value", String.class, ".*");
             minLength = utils.annotationValue(mir, "minLength", Integer.class, 0);
@@ -85,6 +88,7 @@ public class StringPatternHandler implements ConstraintHandler {
             if (maxLength < 0) {
                 utils.fail("Max length " + maxLength + " is less than zero.", ve, mir);
             }
+            this.nullable = nullable;
         }
 
         private String patternVarName() {
@@ -111,21 +115,35 @@ public class StringPatternHandler implements ConstraintHandler {
                 bulletPoints.accept("Must match the pattern /" + pattern.pattern() + "/.");
             }
             if (minLength != 0) {
-                bulletPoints.accept("Must be >= " + minLength + " in length.");
+                bulletPoints.accept("Must be &gt;= " + minLength + " in length.");
             }
             if (maxLength != Integer.MAX_VALUE) {
-                bulletPoints.accept("Must be <= " + maxLength + " in length.");
+                bulletPoints.accept("Must be &lt;= " + maxLength + " in length.");
             }
         }
 
+        private <T, B extends ClassBuilder.BlockBuilderBase<T, B, X>, X>
+                ClassBuilder.ConditionBuilder<ClassBuilder.IfBuilder<B>>
+                applyNullCheck(String fieldVariableName,
+                        ClassBuilder.ConditionBuilder<ClassBuilder.IfBuilder<B>> iff) {
+            if (nullable) {
+//                return iff.isNotNull(fieldVariableName);
+                return iff.parenthesize().booleanExpression(fieldVariableName
+                        + " != null").closeParenthesesAnd().isTrue().and();
+            }
+            return iff;
+        }
+
         @Override
-        public void generate(String fieldVariableName, String problemsListVariableName,
-                AnnotationUtils utils, ClassBuilder.BlockBuilderBase<?, ?, ?> bb) {
+        public <T, B extends ClassBuilder.BlockBuilderBase<T, B, X>, X> void generate(
+                String fieldVariableName, String problemsListVariableName,
+                String addMethodName, AnnotationUtils utils, B bb) {
             bb.lineComment(getClass().getName());
             if (minLength != 0) {
-                bb.iff().invoke("length").on(fieldVariableName)
+                applyNullCheck(fieldVariableName, bb.iff())
+                        .invoke("length").on(fieldVariableName)
                         .isLessThan(minLength)
-                        .invoke("add")
+                        .invoke(addMethodName)
                         .withStringConcatentationArgument(fieldVariableName)
                         .append(" must be at least ")
                         .append(minLength)
@@ -133,9 +151,10 @@ public class StringPatternHandler implements ConstraintHandler {
                         .endConcatenation().on(problemsListVariableName).endIf();
             }
             if (maxLength != Integer.MAX_VALUE) {
-                bb.iff().invoke("length").on(fieldVariableName)
+                applyNullCheck(fieldVariableName, bb.iff())
+                        .invoke("length").on(fieldVariableName)
                         .isGreaterThan(maxLength)
-                        .invoke("add")
+                        .invoke(addMethodName)
                         .withStringConcatentationArgument(fieldVariableName)
                         .append(" must no longer than ")
                         .append(maxLength)
@@ -143,13 +162,14 @@ public class StringPatternHandler implements ConstraintHandler {
                         .endConcatenation().on(problemsListVariableName).endIf();
             }
             if (pattern != null) {
-                bb.iff().invoke("find")
+                applyNullCheck(fieldVariableName, bb.iff())
+                        .invoke("find")
                         .onInvocationOf("matcher")
                         .withArgument(fieldVariableName)
                         .on(patternVarName())
-                        .isFalse()
-                        .endCondition()
-                        .invoke("add")
+                        .eqaullingExpression("false")
+                        //                        .endCondition()
+                        .invoke(addMethodName)
                         .withStringConcatentationArgument("Value of ")
                         .append(fieldVariableName)
                         .append(" '")

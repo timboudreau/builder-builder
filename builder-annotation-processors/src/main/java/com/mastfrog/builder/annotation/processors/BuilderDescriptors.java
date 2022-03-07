@@ -25,12 +25,12 @@ package com.mastfrog.builder.annotation.processors;
 
 import com.mastfrog.annotation.AnnotationUtils;
 import static com.mastfrog.annotation.AnnotationUtils.capitalize;
+import static com.mastfrog.annotation.AnnotationUtils.simpleName;
 import com.mastfrog.builder.annotation.processors.spi.ConstraintGenerator;
 import com.mastfrog.java.vogon.ClassBuilder;
-import com.mastfrog.java.vogon.ClassBuilder.BlockBuilder;
 import com.mastfrog.java.vogon.ClassBuilder.BlockBuilderBase;
 import com.mastfrog.java.vogon.ClassBuilder.InvocationBuilder;
-import com.mastfrog.java.vogon.ClassBuilder.MethodBuilder;
+import com.mastfrog.java.vogon.ClassBuilder.SwitchBuilder;
 import java.io.IOException;
 import java.io.OutputStream;
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -38,7 +38,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -61,8 +60,8 @@ import javax.tools.JavaFileObject;
  */
 final class BuilderDescriptors {
 
-    private final Map<Element, BuilderDescriptor> descs = new HashMap<>();
-    private final AnnotationUtils utils;
+    final Map<Element, BuilderDescriptor> descs = new HashMap<>();
+    final AnnotationUtils utils;
 
     BuilderDescriptors(AnnotationUtils utils) {
         this.utils = utils;
@@ -108,16 +107,24 @@ final class BuilderDescriptors {
         Boolean.class.getName()
     };
 
+    static <B extends ClassBuilder<C>, C> B addGeneratedAnnotation(B cb) {
+        cb.importing(Generated.class);
+        cb.annotatedWith(Generated.class.getSimpleName(), ab -> {
+            ab.addArgument("value", BuilderAnnotationProcessor.class.getName());
+        });
+        return cb;
+    }
+
     public class BuilderDescriptor {
 
         private static final String SET_PRIM_FIELDS = "__setPrimitiveFields";
 
-        private final Element origin;
-        private TypeElement instanceType;
-        private final Map<VariableElement, FieldDescriptor> paramForVar = new LinkedHashMap<>();
-        private String builderName;
-        private String targetTypeName;
-        private long allPrimitivesMask;
+        final Element origin;
+        TypeElement instanceType;
+        final Map<VariableElement, FieldDescriptor> paramForVar = new LinkedHashMap<>();
+        String builderName;
+        String targetTypeName;
+        long allPrimitivesMask;
         private final Set<BuilderStyles> styles;
 
         BuilderDescriptor(Element e, Set<BuilderStyles> styles) {
@@ -142,12 +149,8 @@ final class BuilderDescriptors {
             targetTypeName = nm;
         }
 
-        private <B extends ClassBuilder<C>, C> B addGeneratedAnnotation(B cb) {
-            cb.importing(Generated.class);
-            cb.annotatedWith(Generated.class.getSimpleName(), ab -> {
-                ab.addArgument("value", BuilderAnnotationProcessor.class.getName());
-            });
-            return cb;
+        AnnotationUtils utils() {
+            return BuilderDescriptors.this.utils;
         }
 
         private void indexPrimitives() {
@@ -156,7 +159,7 @@ final class BuilderDescriptors {
             allPrimitivesMask = 0;
             int cursor = 0;
             for (int i = 0; i < fds.size(); i++) {
-                if (!fds.get(i).optional) {
+                if (!fds.get(i).optional && fds.get(i).isPrimitive()) {
                     fds.get(i).primitiveIndex = cursor;
                     allPrimitivesMask |= 1L << cursor;
                     cursor++;
@@ -186,7 +189,7 @@ final class BuilderDescriptors {
             paramForVar.put(param, fv);
         }
 
-        private boolean containsName(String nm) {
+        boolean containsName(String nm) {
             for (FieldDescriptor fd : paramForVar.values()) {
                 if (nm.equals(fd.fieldName)) {
                     return true;
@@ -195,7 +198,7 @@ final class BuilderDescriptors {
             return false;
         }
 
-        private String uniquify(String s) {
+        String uniquify(String s) {
             String test = s;
             while (containsName(test)) {
                 test = "_" + test;
@@ -203,7 +206,7 @@ final class BuilderDescriptors {
             return test;
         }
 
-        private String packageName() {
+        String packageName() {
             String result = utils.packageName(origin);
             int ix = result.indexOf('(');
             if (ix > 0) {
@@ -212,7 +215,13 @@ final class BuilderDescriptors {
             return result;
         }
 
-        private void generateIsSetMethod(ClassBuilder<String> cb) {
+        void decorateClassWithConstraints(ClassBuilder<String> cb) {
+            paramForVar.values().forEach(fd -> {
+                fd.constraints.forEach(cn -> cn.decorateClass(cb));
+            });
+        }
+
+        void generateIsSetMethod(ClassBuilder<String> cb) {
             boolean needed = false;
             for (FieldDescriptor v : paramForVar.values()) {
                 if (v.optional && !v.constraints.isEmpty()) {
@@ -220,6 +229,7 @@ final class BuilderDescriptors {
                     break;
                 }
             }
+            needed = true;
             if (needed) {
                 cb.method("_isSet").withModifier(Modifier.PRIVATE)
                         .returning("boolean")
@@ -227,271 +237,27 @@ final class BuilderDescriptors {
                         .body(bb -> {
                             bb.switchingOn("__fieldName", sw -> {
                                 for (FieldDescriptor v : paramForVar.values()) {
-                                    sw.inCase(v.fieldName, bl -> {
-                                        int ix = v.primitiveIndex();
-                                        if (ix != -1) {
-                                            bl.returning("( " + SET_PRIM_FIELDS + " & 1L << " + ix + ") != 0");
-                                        } else {
-                                            bl.returning(v.fieldName + " != null");
-                                        }
-                                    });
-                                    sw.inDefaultCase(dc -> {
-                                        dc.andThrow(nb -> {
-                                            nb.withStringConcatentationArgument("Unknown field '")
-                                                    .appendExpression("__fieldName").append('\'')
-                                                    .endConcatenation().ofType("AssertionError");
-                                        });
-                                    });
+                                    v.generateIsSetTest(SET_PRIM_FIELDS, sw);
                                 }
+                                sw.inDefaultCase(dc -> {
+                                    dc.andThrow(nb -> {
+                                        nb.withStringConcatentationArgument("Unknown field '")
+                                                .appendExpression("__fieldName").append('\'')
+                                                .endConcatenation().ofType("AssertionError");
+                                    });
+                                });
                             });
                         });
             }
-        }
-
-        private List<FieldDescriptor> sorted(Collection<? extends FieldDescriptor> c) {
-            List<FieldDescriptor> result = new ArrayList<>(c);
-            Collections.sort(result);
-            return result;
-        }
-
-        private Set<FieldDescriptor> omitting(FieldDescriptor one, Set<FieldDescriptor> all) {
-            Set<FieldDescriptor> result = new HashSet<>(all);
-            result.remove(one);
-            return result;
-        }
-
-        private Set<FieldDescriptor> including(FieldDescriptor one, Set<FieldDescriptor> all) {
-            Set<FieldDescriptor> result = new HashSet<>(all);
-            result.add(one);
-            return result;
-        }
-
-        private Set<FieldDescriptor> combine(Collection<? extends FieldDescriptor> a, Collection<? extends FieldDescriptor> b) {
-            Set<FieldDescriptor> result = new HashSet<>(a);
-            result.addAll(b);
-            return result;
         }
 
         ClassBuilder<String> generate() throws IOException {
-            return generateFlat();
-//            if (styles.contains(BuilderStyles.FLAT)) {
-//                return generateFlat();
-//            } else {
-//                return generateCartesian();
-//            }
-        }
-/*
-        ClassBuilder<String> generateCartesian() throws IOException {
-            Set<FieldDescriptor> requiredFields = requiredFields();
-            Set<FieldDescriptor> optionalFields = optionalFields();
-            Set<FieldDescriptor> used = Collections.emptySet();
-            OneProductBuilder opb = new OneProductBuilder(null, used, requiredFields, optionalFields);
-            cartBuilders.put(builderName, opb);
-            return opb.build().parent;
-        }
-
-        private Map<String, OneProductBuilder> cartBuilders = new HashMap<>();
-
-        private String oneBuilderName(Collection<? extends FieldDescriptor> used, Collection<? extends FieldDescriptor> unused) {
-            if (used.isEmpty()) {
-                return builderName;
-            }
-            StringBuilder sb = new StringBuilder(builderName).append("With");
-            for (FieldDescriptor fd : sorted(used)) {
-                sb.append(capitalize(fd.fieldName));
-            }
-            StringBuilder sb2 = new StringBuilder(builderName).append("Sans");
-            for (FieldDescriptor fd : sorted(unused)) {
-                sb2.append(capitalize(fd.fieldName));
-            }
-            if (sb2.length() < sb.length()) {
-                return sb2.toString();
-            }
-            return sb.toString();
-        }
-
-        private final Map<String, OneProductBuilder> cartesians = new HashMap<>();
-
-        private OneProductBuilder subBuilder(FieldDescriptor applying,
-                ClassBuilder<String> parent,
-                Set<FieldDescriptor> used,
-                Set<FieldDescriptor> required, Set<FieldDescriptor> optional) {
-
-            String nm = oneBuilderName(used, required);
-            OneProductBuilder opb = cartesians.get(nm);
-            if (opb == null) {
-                opb = new OneProductBuilder(parent, including(applying, used),
-                        omitting(applying, required), optional);
-                cartesians.put(nm, opb);
-                return opb;
-            }
-            return null;
-        }
-
-        private ClassBuilder<String> parentBuilder(ClassBuilder<String> parent) {
-            if (parent == null) {
-                parent = addGeneratedAnnotation(ClassBuilder.forPackage(packageName())
-                        .named(builderName))
-                        .withModifier(Modifier.FINAL, Modifier.PUBLIC)
-                        .autoToString()
-                        .constructor(con -> {
-                            con.setModifier(Modifier.PUBLIC)
-                                    .body().endBlock();
-                        });
-            }
-            return parent;
-        }
-
-        class OneProductBuilder {
-
-            private final ClassBuilder<String> parent;
-            private final ClassBuilder<?> target;
-            private final Set<FieldDescriptor> used;
-            private final Set<FieldDescriptor> unused;
-            private final Set<FieldDescriptor> optional;
-            private String nm;
-
-            OneProductBuilder(ClassBuilder<String> parent, Set<FieldDescriptor> used, Set<FieldDescriptor> required, Set<FieldDescriptor> optional) {
-                this.parent = parentBuilder(parent);
-                this.used = used;
-                this.unused = required;
-                this.optional = optional;
-                nm = oneBuilderName(used, required);
-                if (parent == null) {
-                    target = this.parent;
-                } else {
-                    target = addGeneratedAnnotation(parent
-                            .innerClass(nm)
-                            .withModifier(Modifier.PUBLIC, Modifier.STATIC, Modifier.FINAL)
-                            .autoToString());
-                }
-            }
-
-            String name() {
-                return nm;
-            }
-
-            private void generateFields() {
-                for (FieldDescriptor fd : used) {
-                    target.field(fd.fieldName)
-                            .withModifier(Modifier.PRIVATE, Modifier.FINAL)
-                            .ofType(fd.typeName());
-                }
-                for (FieldDescriptor fd : optional) {
-                    target.field(fd.fieldName)
-                            .withModifier(Modifier.PRIVATE)
-                            .ofType(fd.typeName());
-                }
-            }
-
-            private List<FieldDescriptor> assignedFields() {
-                List<FieldDescriptor> result = new ArrayList<>(used);
-                result.addAll(optional);
-                Collections.sort(result);
-                return result;
-            }
-
-            private void generateConstructor() {
-                target.constructor(cb -> {
-                    List<FieldDescriptor> existing = assignedFields();
-                    for (FieldDescriptor fd : existing) {
-                        cb.addArgument(fd.typeName(), fd.fieldName);
-                    }
-                    cb.body(bb -> {
-                        for (FieldDescriptor fd : existing) {
-                            if (!fd.optional && !fd.isPrimitive()) {
-                                bb.ifNull(fd.fieldName)
-                                        .andThrow(nb -> {
-                                            nb.withStringConcatentationArgument(fd.fieldName)
-                                                    .append(" may not be null.")
-                                                    .endConcatenation()
-                                                    .ofType("IllegalArgumentException");
-                                        });
-                            }
-                        }
-
-                        for (FieldDescriptor fd : existing) {
-                            bb.assign("this." + fd.fieldName).toExpression(
-                                    fd.fieldName);
-                        }
-                    });
-                });
-            }
-
-            private void generateBuildMethod() {
-                if (unused.size() == 1) {
-                    FieldDescriptor last = unused.iterator().next();
-                    String typeToBuild = BuilderDescriptor.this.targetTypeName;
-                    target.method("buildWith" + capitalize(last.fieldName))
-                            .withModifier(Modifier.PUBLIC, Modifier.FINAL)
-                            .returning(typeToBuild)
-                            .body(bb -> {
-                                bb.returningNew(nb -> {
-                                    for (FieldDescriptor fd : paramForVar.values()) {
-                                        if (fd != last) {
-                                            nb.withArgumentFromField(fd.fieldName).ofThis();
-                                        } else {
-                                            nb.withArgument(fd.fieldName);
-                                        }
-                                    }
-                                    nb.ofType(typeToBuild);
-                                });
-                            });
-                }
-            }
-
-            private void generateOptionalSetters() {
-                for (FieldDescriptor fd : sorted(optional)) {
-                    fd.generate(target);
-                }
-            }
-
-            private void generateRequiredSetters() {
-                if (unused.size() == 1) {
-                    System.out.println("  no req setters for " + nm);
-                    return;
-                }
-                for (FieldDescriptor fd : sorted(unused)) {
-                    List<FieldDescriptor> args = sorted(including(fd, used));
-                    String builderName = oneBuilderName(args, omitting(fd, unused));
-                    target.method("with" + capitalize(fd.fieldName))
-                            .withModifier(Modifier.PUBLIC, Modifier.FINAL)
-                            .addArgument(fd.typeName(), fd.fieldName)
-                            .docComment(fd.setterJavadoc())
-                            .returning(builderName)
-                            .body(bb -> {
-                                OneProductBuilder opb
-                                        = subBuilder(fd, parent,
-                                                used, unused, optional);
-                                bb.returningNew(nb -> {
-                                    for (FieldDescriptor a : args) {
-                                        if (a != fd) {
-                                            nb.withArgumentFromField(a.fieldName).ofThis();
-                                        } else {
-                                            nb.withArgument(a.fieldName);
-                                        }
-                                    }
-                                    nb.ofType(builderName);
-                                });
-                                if (opb != null) {
-                                    System.out.println("CREATE SUB " + opb.name());
-                                    opb.build();
-                                }
-                            });
-                }
-            }
-
-            public OneProductBuilder build() {
-                System.out.println("building " + nm);
-                generateConstructor();
-                generateFields();
-                generateOptionalSetters();
-                generateRequiredSetters();
-                generateBuildMethod();
-                return this;
+            if (styles.contains(BuilderStyles.FLAT)) {
+                return generateFlat();
+            } else {
+                return new CartesianGenerator.BuilderContext(origin, this).build();
             }
         }
-        */
 
         Set<FieldDescriptor> requiredFields() {
             Set<FieldDescriptor> result = new LinkedHashSet<>();
@@ -520,8 +286,8 @@ final class BuilderDescriptors {
                     pn).named(builderName)
                     .docComment("Generated builder from annotations on " + origin)
                     .withModifier(Modifier.FINAL).withModifier(Modifier.PUBLIC)
-                    .autoToString())
-                    .generateDebugLogCode();
+                    .autoToString()) //                    .generateDebugLogCode()
+                    ;
 
             indexPrimitives();
             generateIsSetMethod(cb);
@@ -584,20 +350,24 @@ final class BuilderDescriptors {
         public void generateUnsetCheck(BlockBuilderBase<?, ?, ?> bb) {
             boolean hcgs = hasConstraintGenerators();
             if (this.allPrimitivesMask != 0 || hcgs) {
-                ClassBuilder.IfBuilder<?> iff = bb.iff().booleanExpression("(this." + SET_PRIM_FIELDS + " & " + this.allPrimitivesMask + "L) != " + this.allPrimitivesMask + "L");
                 String probName = uniquify("problems");
-                BlockBuilderBase<?, ?, ?> probsOwnerBlock = iff;
-                if (!hcgs) {
-                    probsOwnerBlock = bb;
-                }
-                probsOwnerBlock.declare(probName).initializedWithNew().ofType(ArrayList.class.getName() + "<String>").as(List.class.getName() + "<String>");
+                bb.declare(probName).initializedWithNew()
+                        .withArgument(4)
+                        .ofType(ArrayList.class.getName() + "<>").as(List.class.getName() + "<String>");
 
+                ClassBuilder.IfBuilder<?> iff = bb.iff().booleanExpression("(this." + SET_PRIM_FIELDS + " & " + this.allPrimitivesMask + "L) != " + this.allPrimitivesMask + "L");
                 for (FieldDescriptor fd : paramForVar.values()) {
                     fd.generateValidityCheck(iff, probName);
-                    fd.generateConstraints(probName, probsOwnerBlock);
                 }
+                iff.endIf();
 
-                ClassBuilder.IfBuilder<?> haveProblsBlock = probsOwnerBlock.iff().invoke("isEmpty").on(probName).isFalse().endCondition();
+                ClassBuilder.IfBuilder<?> conif = bb.iff().invoke("isEmpty").on(probName).isTrue().endCondition();
+                for (FieldDescriptor fd : paramForVar.values()) {
+                    fd.generateConstraints(probName, conif);
+                }
+                conif.endIf();
+
+                ClassBuilder.IfBuilder<?> haveProblsBlock = bb.iff().invoke("isEmpty").on(probName).isFalse().endCondition();
 
                 String sb = uniquify("message");
                 haveProblsBlock.declare(sb).initializedWithNew().ofType(StringBuilder.class.getName()).as(StringBuilder.class.getName());
@@ -614,16 +384,15 @@ final class BuilderDescriptors {
                         .onInvocationOf("append").withStringLiteral(" in ").on(sb);
 
                 haveProblsBlock.andThrow().withArgumentFromInvoking("toString").on(sb).ofType("IllegalStateException");
-                iff.endIf();
             }
         }
 
         class FieldDescriptor implements Comparable<FieldDescriptor> {
 
-            private final Set<ConstraintGenerator> constraints;
-            private final VariableElement var;
-            private final boolean optional;
-            private String fieldName;
+            final Set<ConstraintGenerator> constraints;
+            final VariableElement var;
+            final boolean optional;
+            String fieldName;
             private int primitiveIndex = -1;
 
             public FieldDescriptor(VariableElement var, boolean optional, String fieldName, Set<ConstraintGenerator> constraints) {
@@ -634,10 +403,25 @@ final class BuilderDescriptors {
             }
 
             private int primitiveIndex() {
-                if (primitiveIndex == -1) {
+                if (primitiveIndex == -1 && isPrimitive()) {
                     indexPrimitives();
                 }
                 return primitiveIndex;
+            }
+
+            <C> void generateIsSetTest(String setMaskName, SwitchBuilder<C> sw) {
+                if (optional) {
+                    sw.inStringLiteralCase(fieldName)
+                            .returning(true).endBlock();
+                } else if (isPrimitive()) {
+                    sw.inStringLiteralCase(fieldName)
+                            .returning("( " + setMaskName + " & 1L << " + primitiveIndex() + ") != 0L")
+                            .endBlock();
+                } else {
+                    sw.inStringLiteralCase(fieldName)
+                            .returning("this." + fieldName + " != null")
+                            .endBlock();
+                }
             }
 
             public FieldDescriptor withFieldName(String fieldName) {
@@ -645,7 +429,7 @@ final class BuilderDescriptors {
                 return this;
             }
 
-            private String typeName() {
+            String typeName() {
                 String tp = var.asType().toString();
                 if (isPrimitive() && optional) {
                     switch (tp) {
@@ -661,10 +445,25 @@ final class BuilderDescriptors {
             <C> void generateValidityCheck(BlockBuilderBase<C, ?, ?> bb, String problemCollectionName) {
                 int pi = primitiveIndex();
                 if (pi != -1) {
+                    bb.lineComment("Flag bit " + pi);
                     bb.iff().booleanExpression("(this." + SET_PRIM_FIELDS + " & "
                             + (1L << pi) + "L) == 0")
-                            .invoke("add").withStringLiteral(fieldName + " was not set").on(problemCollectionName)
+                            .invoke("add")
+                            .withStringConcatentationArgument(fieldName)
+                            .append(" was not set and is required").endConcatenation()
+                            .on(problemCollectionName)
                             .endIf();
+                } else if (!optional && pi == -1) {
+                    bb.lineComment("NOt optional: " + fieldName);
+
+                    System.out.println("NOT OPTIONAL: " + fieldName);
+                    bb.ifNull("this." + fieldName).invoke("add")
+                            .withStringConcatentationArgument(fieldName)
+                            .append(" was not set and is required")
+                            .endConcatenation().on(problemCollectionName)
+                            .endIf();
+                } else {
+                    bb.lineComment(fieldName + " is optional, no null-check required");
                 }
             }
 
@@ -694,8 +493,14 @@ final class BuilderDescriptors {
             }
 
             <C> void generate(ClassBuilder<C> cb) {
+                generate(cb, true, false);
+            }
+
+            <C> void generate(ClassBuilder<C> cb, boolean createField, boolean runConstraints) {
                 String tn = typeName();
-                cb.field(fieldName).withModifier(Modifier.PRIVATE).ofType(tn);
+                if (createField) {
+                    cb.field(fieldName).withModifier(Modifier.PRIVATE).ofType(tn);
+                }
                 cb.method("with" + capitalize(fieldName))
                         .withModifier(Modifier.PUBLIC, Modifier.FINAL)
                         .addArgument(tn, fieldName)
@@ -711,19 +516,32 @@ final class BuilderDescriptors {
                                                     .append(" may not be null")
                                                     .endConcatenation();
 
-                                        }).ofType(IllegalArgumentException.class.getName());
+                                        }).ofType("IllegalArgumentException");
                                     });
                                 });
                             }
+                            if (runConstraints && !constraints.isEmpty()) {
+                                cb.importing(Consumer.class);
+                                bb.declare("__failer")
+                                        .initializedFromLambda().withArgument("_msg")
+                                        .body().andThrow()
+                                        .withArgument("_msg")
+                                        .ofType("IllegalArgumentException")
+                                        .as("Consumer<String>");
+                                for (ConstraintGenerator c : constraints) {
+                                    c.generate(fieldName, "__failer", "accept", utils, bb);
+                                }
+                            }
                             if (prim) {
-                                bb.statement("this." + SET_PRIM_FIELDS + " |= " + (1L << primitiveIndex()) + "L");
+                                bb.statement("this." + SET_PRIM_FIELDS
+                                        + " |= " + (1L << primitiveIndex()) + "L");
                             }
                             bb.assign("this." + fieldName).toExpression(fieldName)
                                     .returningThis();
                         });
             }
 
-            void generateConstraints(String problemsVar, BlockBuilderBase<?, ?, ?> into) {
+            <T, B extends ClassBuilder.BlockBuilderBase<T, B, X>, X> void generateConstraints(String problemsVar, B into) {
                 for (ConstraintGenerator gen : this.constraints) {
                     gen.generate(fieldName, problemsVar, utils, into);
                 }
@@ -737,9 +555,11 @@ final class BuilderDescriptors {
                 TypeMirror type = var.asType();
                 for (String tp : PRIMITIVE_TYPES) {
                     if (utils.isAssignable(type, tp)) {
+                        System.out.println(tp + " is assignable to " + type + " - PRIMITIVE ");
                         return true;
                     }
                 }
+                System.out.println("NOT PRIMITIVE: " + type);
                 return false;
             }
 
@@ -754,6 +574,15 @@ final class BuilderDescriptors {
             @Override
             public int compareTo(FieldDescriptor o) {
                 return fieldName.compareTo(o.fieldName);
+            }
+
+            public String toBulletPoint() {
+                return "<li><code><b>" + fieldName + "</b> &emdash; " + simpleName(typeName()) + "</code></li>\n";
+            }
+
+            @Override
+            public String toString() {
+                return simpleName(typeName()) + " " + fieldName;
             }
         }
     }
