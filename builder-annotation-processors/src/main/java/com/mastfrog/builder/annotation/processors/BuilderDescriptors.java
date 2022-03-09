@@ -44,6 +44,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 import javax.annotation.processing.Filer;
 import javax.annotation.processing.Generated;
 import javax.lang.model.element.Element;
@@ -67,8 +68,11 @@ final class BuilderDescriptors {
         this.utils = utils;
     }
 
-    public void add(Element e, Set<BuilderStyles> styles, Consumer<BuilderDescriptor> c) {
-        c.accept(descs.computeIfAbsent(e, e1 -> new BuilderDescriptor(e, styles)));
+    public void add(Element e, Set<BuilderStyles> styles, String builderNameFromAnnotation,
+            int codeGenerationVersion,
+            Consumer<BuilderDescriptor> c) {
+        c.accept(descs.computeIfAbsent(e, e1 -> new BuilderDescriptor(e, styles,
+                builderNameFromAnnotation, codeGenerationVersion)));
     }
 
     public void generate() throws IOException {
@@ -79,7 +83,6 @@ final class BuilderDescriptors {
             try ( OutputStream out = src.openOutputStream()) {
                 out.write(cb.toString().getBytes(UTF_8));
             }
-            System.out.println(src);
         }
     }
     static final String[] PRIMITIVE_TYPES = {
@@ -125,28 +128,51 @@ final class BuilderDescriptors {
         String builderName;
         String targetTypeName;
         long allPrimitivesMask;
-        private final Set<BuilderStyles> styles;
+        final Set<BuilderStyles> styles;
+        final int codeGenerationVersion;
+        final GenericsAnalyzer generics;
 
-        BuilderDescriptor(Element e, Set<BuilderStyles> styles) {
+        BuilderDescriptor(Element e, Set<BuilderStyles> styles, String builderNameFromAnnotation,
+                int codeGenerationVersion) {
             this.origin = e;
             this.styles = styles;
-            String nm;
+            this.codeGenerationVersion = codeGenerationVersion;
+            String nm, bn;
             switch (e.getKind()) {
                 case METHOD:
                     ExecutableElement ex = (ExecutableElement) e;
                     nm = AnnotationUtils.simpleName(ex.getReturnType());
-                    builderName = nm + "Builder";
+                    bn = nm + "Builder";
                     break;
                 default:
                     nm = AnnotationUtils.enclosingType(e).getSimpleName().toString();
                     String[] parts = nm.split("[\\.\\$]");
                     if (parts.length > 0) {
-                        builderName = parts[parts.length - 1] + "Builder";
+                        bn = parts[parts.length - 1] + "Builder";
                     } else {
-                        builderName = nm + "Builder";
+                        bn = nm + "Builder";
                     }
             }
-            targetTypeName = nm;
+            if (builderNameFromAnnotation != null) {
+                bn = builderNameFromAnnotation;
+            }
+            this.builderName = bn;
+            this.targetTypeName = nm;
+            System.out.println("\n\n------ TYPE ANALYSIS ----------");
+            generics = new GenericsAnalyzer(utils, (ExecutableElement) e);
+            System.out.println("\n\n--------- END TYPE ANALYSIS --------\n");
+        }
+
+        public String withGenericBound(String generic) {
+            return generics.nameWithBound(generic);
+        }
+
+        public List<? extends TypeMirror> thrownTypes() {
+            return ((ExecutableElement) origin).getThrownTypes();
+        }
+
+        public List<String> genericsRequiredFor(Collection<FieldDescriptor> flds) {
+            return generics.genericNamesRequiredFor(flds);
         }
 
         AnnotationUtils utils() {
@@ -307,7 +333,12 @@ final class BuilderDescriptors {
             }
             ClassBuilder.MethodBuilder<ClassBuilder<String>> mb = cb.method("build")
                     .withModifier(Modifier.PUBLIC, Modifier.FINAL)
-                    .returning(targetTypeName);
+                    .returning(targetTypeName)
+                    .conditionally(!thrownTypes().isEmpty(), mmb -> {
+                        for (TypeMirror tm : thrownTypes()) {
+                            mmb.throwing(tm.toString());
+                        }
+                    });
             if (instanceType != null) {
                 String targetParam = uniquify("target");
                 mb.addArgument(instanceType.getSimpleName().toString(), targetParam);
@@ -387,7 +418,7 @@ final class BuilderDescriptors {
             }
         }
 
-        class FieldDescriptor implements Comparable<FieldDescriptor> {
+        class FieldDescriptor implements Comparable<FieldDescriptor>, Supplier<String> {
 
             final Set<ConstraintGenerator> constraints;
             final VariableElement var;
@@ -400,6 +431,10 @@ final class BuilderDescriptors {
                 this.optional = optional;
                 this.fieldName = fieldName;
                 this.constraints = constraints;
+            }
+
+            public String get() {
+                return fieldName;
             }
 
             private int primitiveIndex() {
@@ -456,7 +491,6 @@ final class BuilderDescriptors {
                 } else if (!optional && pi == -1) {
                     bb.lineComment("NOt optional: " + fieldName);
 
-                    System.out.println("NOT OPTIONAL: " + fieldName);
                     bb.ifNull("this." + fieldName).invoke("add")
                             .withStringConcatentationArgument(fieldName)
                             .append(" was not set and is required")
@@ -532,7 +566,7 @@ final class BuilderDescriptors {
                                     c.generate(fieldName, "__failer", "accept", utils, bb);
                                 }
                             }
-                            if (prim) {
+                            if (prim && !optional && !runConstraints) {
                                 bb.statement("this." + SET_PRIM_FIELDS
                                         + " |= " + (1L << primitiveIndex()) + "L");
                             }
@@ -555,11 +589,9 @@ final class BuilderDescriptors {
                 TypeMirror type = var.asType();
                 for (String tp : PRIMITIVE_TYPES) {
                     if (utils.isAssignable(type, tp)) {
-                        System.out.println(tp + " is assignable to " + type + " - PRIMITIVE ");
                         return true;
                     }
                 }
-                System.out.println("NOT PRIMITIVE: " + type);
                 return false;
             }
 

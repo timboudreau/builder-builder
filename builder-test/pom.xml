@@ -56,16 +56,17 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.10.0</version>
+                <version>3.3</version>
+                <!--<version>3.10.0</version>-->
                 <configuration>
                     <source>${java.source.level}</source>
                     <target>${java.source.level}</target>
                     <showDeprecation>true</showDeprecation>
                     <showWarnings>true</showWarnings>
                     <encoding>UTF-8</encoding>
-                    <verbose>true</verbose>
-                    <!--<maven.compiler.force.javac>true</maven.compiler.force.javac>-->
-                    
+                    <!--<verbose>true</verbose>-->
+                    <maven.compiler.force.javac>true</maven.compiler.force.javac>
+
                     <!--                    <annotationProcessorPaths>
                         <dependency>
                             <groupId>com.mastfrog</groupId>
@@ -74,14 +75,20 @@
                         </dependency>
                     </annotationProcessorPaths>
                     <annotationProcessors>com.mastfrog.builder.annotation.processors.BuilderAnnotationProcessor</annotationProcessors>-->
+
+                    <!--<compilerArgument>-proc:none</compilerArgument>-->
+                    <!--<compilerArgument>-Xlint:unchecked</compilerArgument>-->
                     
-                    <configuration>
-                        <compilerArgument>-proc:none</compilerArgument>        
-                    </configuration>                    
+                    <compilerArguments>
+                        <endorseddirs>${endorsed.dir}</endorseddirs>
+                    </compilerArguments>
+                    <compilerArgs>
+                        <arg>-Xlint:unchecked</arg>
+                    </compilerArgs>                    
                 </configuration>
             </plugin>
-            
-<!--            <plugin>
+
+            <!--            <plugin>
                 <groupId>org.bsc.maven</groupId>
                 <artifactId>maven-processor-plugin</artifactId>
                 <version>4.5</version>

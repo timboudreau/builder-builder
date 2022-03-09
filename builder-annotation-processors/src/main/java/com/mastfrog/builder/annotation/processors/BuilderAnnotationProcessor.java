@@ -44,6 +44,7 @@ import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
+import javax.lang.model.type.TypeMirror;
 
 /**
  *
@@ -53,6 +54,8 @@ import javax.lang.model.element.VariableElement;
 @ServiceProvider(Processor.class)
 public class BuilderAnnotationProcessor extends AbstractProcessor {
 
+    private static final int CURRENT_CODE_GENERATION_VERSION = 1;
+    private static final int MIN_CODE_GENERATION_VERSION = 1;
     private AnnotationUtils utils;
     private BuilderDescriptors descs;
     private ConstraintHandlers handlers;
@@ -96,7 +99,30 @@ public class BuilderAnnotationProcessor extends AbstractProcessor {
 
     void record(Element el, AnnotationMirror mir) {
         Set<BuilderStyles> styles = BuilderStyles.styles(utils, mir);
-        descs.add(el, styles, desc -> {
+        String builderNameFromAnnotation = utils.annotationValue(mir, "className", String.class, null);
+        int codeGenerationVersion = utils.annotationValue(mir, "codeGenerationVersion", Integer.class, CURRENT_CODE_GENERATION_VERSION);
+        if (codeGenerationVersion > CURRENT_CODE_GENERATION_VERSION) {
+            utils.fail("Unknown code-generation-version " + codeGenerationVersion + " - possibly "
+                    + "you have an older version of this library ahead of the one you want to use "
+                    + "on your classpath", el, mir);
+            return;
+        }
+        if (codeGenerationVersion < MIN_CODE_GENERATION_VERSION) {
+            utils.fail("Code generation version " + codeGenerationVersion + " is not supported "
+                    + "by this version of BuilderAnnotationProcessor.  Perhaps you need an "
+                    + "older version of it?", el, mir);
+            return;
+        }
+        if (builderNameFromAnnotation != null) {
+            String pkg = utils.packageName(el);
+            TypeMirror conflict = utils.type(pkg + "." + builderNameFromAnnotation);
+            if (conflict != null) {
+                utils.fail("Cannot name a builder '" + pkg + "." + builderNameFromAnnotation + " - "
+                    + "a class named " + builderNameFromAnnotation + " already exists in that package");
+                return;
+            }
+        }
+        descs.add(el, styles, builderNameFromAnnotation, codeGenerationVersion, desc -> {
             if (el.getKind() == ElementKind.METHOD) {
                 desc.onInstanceOf(AnnotationUtils.enclosingType(el));
             }
@@ -112,7 +138,6 @@ public class BuilderAnnotationProcessor extends AbstractProcessor {
 
     void handleOneParameter(BuilderDescriptor bd, Element target, String fieldName, boolean optional, VariableElement on) {
         Set<ConstraintGenerator> gen = handlers.generators(target, on);
-        System.out.println("PARAM " + fieldName + " OPTIONAL " + optional);
         bd.handleOneParameter(fieldName, optional, on, gen);
     }
 

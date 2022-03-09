@@ -25,7 +25,6 @@
 package com.mastfrog.builder.test.blah;
 import com.mastfrog.builder.test.ComplexThing;
 import com.mastfrog.builder.test.ComplexThing.OtherThing;
-import com.mastfrog.builder.test.ComplexThingBuilder;
 import java.util.Collections;
 /**
  *
@@ -34,12 +33,12 @@ import java.util.Collections;
 public class BT {
 
     public static void main(String[] args) {
-        ComplexThingBuilder ctb = new ComplexThingBuilder();
-        ComplexThing x = ctb.withName("Pooger").withId(23).withIsPretty(true)
-                .withContents(Collections.emptySet())
-                .withOther(new OtherThing("foo"))
-                .withWhen(5)
-                .buildWithWeight(5F);
-        System.out.println("Have an x " + x);
+//        ComplexThingBuilder ctb = new ComplexThingBuilder();
+//        ComplexThing x = ctb.withName("Pooger").withId(23).withIsPretty(true)
+//                .withContents(Collections.emptySet())
+//                .withOther(new OtherThing("foo"))
+//                .withWhen(5)
+//                .buildWithWeight(5F);
+//        System.out.println("Have an x " + x);
     }
 }

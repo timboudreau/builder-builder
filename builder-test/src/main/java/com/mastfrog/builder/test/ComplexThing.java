@@ -23,6 +23,7 @@
  */
 package com.mastfrog.builder.test;
 
+import com.mastfrog.builder.annotations.BuilderStyles;
 import java.util.Set;
 import com.mastfrog.builder.annotations.GenerateBuilder;
 import com.mastfrog.builder.annotations.Nullable;
@@ -34,6 +35,8 @@ import com.mastfrog.builder.annotations.constraint.IntMax;
 import com.mastfrog.builder.annotations.constraint.IntMin;
 import com.mastfrog.builder.annotations.constraint.LongMax;
 import com.mastfrog.builder.annotations.constraint.StringPattern;
+import java.io.IOException;
+import java.rmi.UnknownHostException;
 
 /**
  *
@@ -48,14 +51,14 @@ public class ComplexThing {
     private final Set<String> contents;
     private final OtherThing other;
 
-    @GenerateBuilder
-    public ComplexThing(@IntMin(23) @IntMax(52) int id,
+//    @GenerateBuilder()
+    ComplexThing(@IntMin(23) @IntMax(52) int id,
             @Nullable @StringPattern(value = "^[A-Z][a-zA-Z0-9]+$", minLength = 3, maxLength = 24) String name,
             @LongMax(51424280634L) long when,
             @FloatMin(1.5F) @FloatMax(2.5F) float weight,
             Set<String> contents,
             @Nullable OtherThing other,
-            boolean isPretty) {
+            boolean isPretty) throws IOException, ClassNotFoundException, UnknownHostException {
         this.id = id;
         this.name = name;
         this.when = when;
@@ -69,7 +72,7 @@ public class ComplexThing {
         return "ComplexThing{" + "id=" + id + ", name=" + name + ", when=" + when + ", weight=" + weight + ", contents=" + contents + ", other=" + other + '}';
     }
 
-    @GenerateBuilder
+//    @GenerateBuilder(styles = {BuilderStyles.FLAT}, codeGenerationVersion = 1)
     public Whoozit whoozit(@IntMax(23) int value, @DoubleMax(1) @DoubleMin(0) double fraction) {
         return new Whoozit(name, value, fraction, this);
     }

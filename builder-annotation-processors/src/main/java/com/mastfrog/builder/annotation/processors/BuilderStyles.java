@@ -35,7 +35,9 @@ import javax.lang.model.element.AnnotationMirror;
  */
 enum BuilderStyles {
     CLOSURES,
-    FLAT,;
+    FLAT,
+    PACKAGE_PRIVATE,
+    ;
 
     static Set<BuilderStyles> styles(AnnotationUtils utils, AnnotationMirror in) {
         // Don't fail the way valueOf() does

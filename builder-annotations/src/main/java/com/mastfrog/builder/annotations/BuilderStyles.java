@@ -56,5 +56,11 @@ public enum BuilderStyles {
      * preferred.
      * </p>
      */
-    FLAT,;
+    FLAT,
+    /**
+     * If included, make the builder class package private rather than exposing
+     * it.
+     */
+    PACKAGE_PRIVATE,
+    ;
 }
