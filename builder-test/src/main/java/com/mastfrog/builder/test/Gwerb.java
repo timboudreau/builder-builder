@@ -21,35 +21,36 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-package com.mastfrog.builder.test.blah;
+package com.mastfrog.builder.test;
 
-import com.mastfrog.builder.test.ComplexThing;
-import com.mastfrog.builder.test.ComplexThing.OtherThing;
-import com.mastfrog.builder.test.ComplexThingBuilder;
-import com.mastfrog.builder.test.BlorkBuilder;
-import java.util.Collections;
+import com.mastfrog.builder.annotations.GenerateBuilder;
+import com.mastfrog.builder.annotations.Nullable;
+import com.mastfrog.builder.annotations.constraint.CollectionConstraint;
+import java.util.Map;
+import java.util.Set;
 
 /**
  *
  * @author Tim Boudreau
  */
-public class BT {
+public class Gwerb<T> {
 
-    public static void main(String[] args) throws java.io.IOException,
-            java.lang.ClassNotFoundException, java.rmi.UnknownHostException {
+    private final Set<String> strings;
+    private final int[] ints;
+    private final Object[] objs;
+    private final Map<String, Object> stuff;
 
-//        new BlorkBuilder().withComplex((ComplexThingBuilder bldr) ->
-//            bldr.withContents(Collections.emptySet()).withIsPretty(true)
-//                    .withWeight(5F).withId(23).withName("goo")
-//                    .withOther(new OtherThing("whee")).buildWithWhen(5L)
-//        );
-//
-//        ComplexThingBuilder ctb = new ComplexThingBuilder();
-//        ComplexThing x = ctb.withName("Pooger").withId(23).withIsPretty(true)
-//                .withContents(Collections.emptySet())
-//                .withOther(new OtherThing("foo"))
-//                .withWhen(5)
-//                .buildWithWeight(5F);
-//        System.out.println("Have an x " + x);
+    @GenerateBuilder
+    public Gwerb(
+            @CollectionConstraint(minSize = 1, maxSize = 10, forbidNullValues = true) Set<String> strings,
+            @Nullable @CollectionConstraint(minSize = 2, maxSize = 12) int[] ints,
+            @CollectionConstraint(minSize = 3, maxSize = 34, forbidNullValues = true,
+                    checked=CharSequence.class) T[] objs,
+            @CollectionConstraint(minSize = 7, maxSize = 17) Map<String, Object> stuff) {
+        this.strings = strings;
+        this.ints = ints;
+        this.objs = objs;
+        this.stuff = stuff;
     }
+
 }

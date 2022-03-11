@@ -102,17 +102,32 @@ public class StringPatternHandler implements ConstraintHandler {
                 bldr.field(patternVarName(), fb -> {
                     fb.withModifier(Modifier.PRIVATE, Modifier.STATIC, Modifier.FINAL)
                             .initializedFromInvocationOf("compile")
-                            .withStringLiteral(pattern.pattern())
+                            .withStringLiteral(doubleBackslashes(pattern.pattern()))
                             .on("Pattern")
                             .ofType(Pattern.class.getSimpleName());
                 });
             }
         }
 
+        private String doubleBackslashes(String s) {
+            if (s.indexOf('\\') < 0) {
+                return s;
+            }
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < s.length(); i++) {
+                char c = s.charAt(i);
+                if (c == '\\') {
+                    sb.append(c);
+                }
+                sb.append(c);
+            }
+            return sb.toString();
+        }
+
         @Override
         public void contributeDocComments(Consumer<String> bulletPoints) {
             if (pattern != null) {
-                bulletPoints.accept("Must match the pattern /" + pattern.pattern() + "/.");
+                bulletPoints.accept("Must match the pattern /" + doubleBackslashes(pattern.pattern()) + "/.");
             }
             if (minLength != 0) {
                 bulletPoints.accept("Must be &gt;= " + minLength + " in length.");
@@ -147,7 +162,9 @@ public class StringPatternHandler implements ConstraintHandler {
                         .withStringConcatentationArgument(fieldVariableName)
                         .append(" must be at least ")
                         .append(minLength)
-                        .append(" characters.")
+                        .append(" characters, but is ")
+                        .appendExpression(fieldVariableName + ".length()")
+                        .append(": '").appendExpression(fieldVariableName).append('\'')
                         .endConcatenation().on(problemsListVariableName).endIf();
             }
             if (maxLength != Integer.MAX_VALUE) {
@@ -158,7 +175,9 @@ public class StringPatternHandler implements ConstraintHandler {
                         .withStringConcatentationArgument(fieldVariableName)
                         .append(" must no longer than ")
                         .append(maxLength)
-                        .append(" characters.")
+                        .append(" characters, but is ")
+                        .appendExpression(fieldVariableName + ".length()")
+                        .append(": '").appendExpression(fieldVariableName).append('\'')
                         .endConcatenation().on(problemsListVariableName).endIf();
             }
             if (pattern != null) {
@@ -175,8 +194,9 @@ public class StringPatternHandler implements ConstraintHandler {
                         .append(" '")
                         .appendExpression(fieldVariableName)
                         .append("' does not match the pattern /")
-                        .append(pattern.pattern())
+                        .append(doubleBackslashes(pattern.pattern()))
                         .append('/')
+                        .append(": '").appendExpression(fieldVariableName).append('\'')
                         .endConcatenation()
                         .on(problemsListVariableName)
                         .endIf();

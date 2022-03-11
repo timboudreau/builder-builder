@@ -95,6 +95,7 @@ public class ByteMinMaxHandler implements ConstraintHandler {
                     .withStringConcatentationArgument(fieldVariableName)
                     .append(" must be less than or equal to ")
                     .append(max)
+                    .append(" but is ").appendExpression(fieldVariableName)
                     .endConcatenation()
                     .on(problemsListVariableName)
                     .endIf();
@@ -143,6 +144,7 @@ public class ByteMinMaxHandler implements ConstraintHandler {
                     .withStringConcatentationArgument(fieldVariableName)
                     .append(" must be greater than or equal to ")
                     .append(min)
+                    .append(" but is ").appendExpression(fieldVariableName)
                     .endConcatenation()
                     .on(problemsListVariableName)
                     .endIf();

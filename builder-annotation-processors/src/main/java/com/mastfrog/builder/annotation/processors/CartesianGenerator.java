@@ -31,7 +31,6 @@ import com.mastfrog.builder.annotation.processors.BuilderDescriptors.BuilderDesc
 import static com.mastfrog.builder.annotation.processors.BuilderDescriptors.addGeneratedAnnotation;
 import com.mastfrog.builder.annotation.processors.spi.ConstraintGenerator;
 import com.mastfrog.java.vogon.ClassBuilder;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -41,6 +40,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.Modifier;
@@ -62,31 +62,48 @@ public class CartesianGenerator {
         return new BuilderContext(el, desc).build();
     }
 
-    private static List<BuilderDescriptors.BuilderDescriptor.FieldDescriptor> sorted(Collection<? extends BuilderDescriptors.BuilderDescriptor.FieldDescriptor> c) {
+    static List<BuilderDescriptors.BuilderDescriptor.FieldDescriptor> sorted(
+            Collection<? extends BuilderDescriptors.BuilderDescriptor.FieldDescriptor> c) {
         List<BuilderDescriptors.BuilderDescriptor.FieldDescriptor> result = new ArrayList<>(c);
         Collections.sort(result);
         return result;
     }
 
-    private static Set<BuilderDescriptors.BuilderDescriptor.FieldDescriptor> omitting(BuilderDescriptors.BuilderDescriptor.FieldDescriptor one, Set<BuilderDescriptors.BuilderDescriptor.FieldDescriptor> all) {
+    static Set<BuilderDescriptors.BuilderDescriptor.FieldDescriptor> omitting(
+            BuilderDescriptors.BuilderDescriptor.FieldDescriptor one,
+            Set<BuilderDescriptors.BuilderDescriptor.FieldDescriptor> all) {
         Set<BuilderDescriptors.BuilderDescriptor.FieldDescriptor> result = new HashSet<>(all);
         result.remove(one);
         return result;
     }
 
-    private static Set<BuilderDescriptors.BuilderDescriptor.FieldDescriptor> including(BuilderDescriptors.BuilderDescriptor.FieldDescriptor one, Set<BuilderDescriptors.BuilderDescriptor.FieldDescriptor> all) {
+    static Set<BuilderDescriptors.BuilderDescriptor.FieldDescriptor> omitting(
+            Set<BuilderDescriptors.BuilderDescriptor.FieldDescriptor> toOmit,
+            Set<BuilderDescriptors.BuilderDescriptor.FieldDescriptor> all) {
+        Set<BuilderDescriptors.BuilderDescriptor.FieldDescriptor> result = new HashSet<>(all);
+        result.removeAll(toOmit);
+        return result;
+    }
+
+    static Set<BuilderDescriptors.BuilderDescriptor.FieldDescriptor> including(
+            BuilderDescriptors.BuilderDescriptor.FieldDescriptor one,
+            Set<BuilderDescriptors.BuilderDescriptor.FieldDescriptor> all) {
         Set<BuilderDescriptors.BuilderDescriptor.FieldDescriptor> result = new HashSet<>(all);
         result.add(one);
         return result;
     }
 
-    private static Set<BuilderDescriptors.BuilderDescriptor.FieldDescriptor> combine(Collection<? extends BuilderDescriptors.BuilderDescriptor.FieldDescriptor> a, Collection<? extends BuilderDescriptors.BuilderDescriptor.FieldDescriptor> b) {
+    static Set<BuilderDescriptors.BuilderDescriptor.FieldDescriptor> combine(
+            Collection<? extends BuilderDescriptors.BuilderDescriptor.FieldDescriptor> a,
+            Collection<? extends BuilderDescriptors.BuilderDescriptor.FieldDescriptor> b) {
         Set<BuilderDescriptors.BuilderDescriptor.FieldDescriptor> result = new HashSet<>(a);
         result.addAll(b);
         return result;
     }
 
-    private static String oneBuilderName(String rootBuilderName, Collection<? extends FieldDescriptor> used, Collection<? extends FieldDescriptor> unused) {
+    private static String oneBuilderName(String rootBuilderName,
+            Collection<? extends FieldDescriptor> used,
+            Collection<? extends FieldDescriptor> unused) {
         if (used.isEmpty()) {
             return rootBuilderName;
         }
@@ -108,6 +125,8 @@ public class CartesianGenerator {
 
         private final Element el;
         private final BuilderDescriptors.BuilderDescriptor desc;
+        private final Map<String, OneProductBuilder> cartBuilders = new HashMap<>();
+        private final Map<String, OneProductBuilder> cartesians = new HashMap<>();
 
         public BuilderContext(Element el, BuilderDescriptors.BuilderDescriptor desc) {
             this.el = el;
@@ -120,15 +139,14 @@ public class CartesianGenerator {
             Set<FieldDescriptor> used = Collections.emptySet();
             OneProductBuilder opb = new OneProductBuilder(null, used,
                     requiredFields, optionalFields);
-            cartBuilders.put(desc.builderName, opb);
+            cartesians.put(desc.builderName, opb);
             ClassBuilder<String> result = opb.build().parent;
 
             return result;
         }
 
-        private Map<String, OneProductBuilder> cartBuilders = new HashMap<>();
-
-        private String oneBuilderName(Collection<? extends FieldDescriptor> used, Collection<? extends FieldDescriptor> unused) {
+        private String oneBuilderName(Collection<? extends FieldDescriptor> used,
+                Collection<? extends FieldDescriptor> unused) {
             if (used.isEmpty()) {
                 return desc.builderName;
             }
@@ -145,8 +163,6 @@ public class CartesianGenerator {
             }
             return sb.toString();
         }
-
-        private final Map<String, OneProductBuilder> cartesians = new HashMap<>();
 
         private OneProductBuilder subBuilder(FieldDescriptor applying,
                 ClassBuilder<String> parent,
@@ -166,9 +182,15 @@ public class CartesianGenerator {
 
         private ClassBuilder<String> parentBuilder(ClassBuilder<String> parent) {
             if (parent == null) {
+                List<String> genericsForOptionals = desc.initialGenerics(GenericSignatureKind.EXPLICIT_BOUNDS);
+
                 parent = addGeneratedAnnotation(ClassBuilder.forPackage(desc.packageName())
                         .named(desc.builderName))
                         .withModifier(Modifier.FINAL)
+                        .withTypeParameters(genericsForOptionals)
+                        //                        .conditionally(!genericsForOptionals.isEmpty(), cb -> {
+                        //                            cb.withTypeParameters(genericsForOptionals);
+                        //                        })
                         .conditionally(!desc.styles.contains(BuilderStyles.PACKAGE_PRIVATE), cb -> {
                             cb.withModifier(Modifier.PUBLIC);
                         }).autoToString()
@@ -210,6 +232,8 @@ public class CartesianGenerator {
             return x.isEmpty();
         }
 
+        private Set<String> appliersGenerated = new HashSet<>();
+
         class OneProductBuilder {
 
             private final ClassBuilder<String> parent;
@@ -220,7 +244,8 @@ public class CartesianGenerator {
             private final List<String> generics;
             private String nm;
 
-            OneProductBuilder(ClassBuilder<String> parent, Set<FieldDescriptor> used, Set<FieldDescriptor> required, Set<FieldDescriptor> optional) {
+            OneProductBuilder(ClassBuilder<String> parent, Set<FieldDescriptor> used,
+                    Set<FieldDescriptor> required, Set<FieldDescriptor> optional) {
                 if (!noOverlap(required, used)) {
                     throw new AssertionError("Overlap " + required + " and " + used);
                 }
@@ -228,7 +253,10 @@ public class CartesianGenerator {
                 this.used = used;
                 this.unused = required;
                 this.optional = optional;
-                generics = desc.genericsRequiredFor(combine(used, optional));
+                generics = desc.genericSignatureForBuilderWith(used, GenericSignatureKind.IMPLICIT_BOUNDS);
+                List<String> fullGenerics
+                        = desc.genericSignatureForBuilderWith(used, GenericSignatureKind.EXPLICIT_BOUNDS);
+//                generics = desc.genericsRequiredFor(combine(used, optional));
                 nm = oneBuilderName(used, required);
                 if (parent == null) {
                     target = this.parent;
@@ -240,14 +268,15 @@ public class CartesianGenerator {
                                     .conditionally(!desc.styles.contains(BuilderStyles.PACKAGE_PRIVATE), cb -> {
                                         cb.withModifier(Modifier.PUBLIC);
                                     })
-                                    .conditionally(!generics.isEmpty(), cb -> {
-                                        List<String> genericsWithBounds = new ArrayList<>();
-                                        for (String g : generics) {
-                                            g = desc.withGenericBound(g);
-                                            genericsWithBounds.add(g);
-                                        }
-                                        cb.withTypeParameters(genericsWithBounds);
-                                    })
+                                    .withTypeParameters(fullGenerics)
+                                    //                                    .conditionally(!generics.isEmpty(), cb -> {
+                                    //                                        List<String> genericsWithBounds = new ArrayList<>();
+                                    //                                        for (String g : generics) {
+                                    //                                            g = desc.withGenericBound(g);
+                                    //                                            genericsWithBounds.add(g);
+                                    //                                        }
+                                    //                                        cb.withTypeParameters(genericsWithBounds);
+                                    //                                    })
                                     .autoToString());
                     applyDocComments();
 
@@ -255,28 +284,20 @@ public class CartesianGenerator {
                         String instField = desc.uniquify("instance");
                         target.field(instField).withModifier(Modifier.FINAL, Modifier.PRIVATE)
                                 .ofType(desc.instanceType.asType().toString());
-//                        parent.constructor(cb -> {
-//
-//                            cb.setModifier(Modifier.PUBLIC)
-//                                    .addArgument(desc.instanceType.asType().toString(), "instance")
-//                                    .body(bb -> {
-//                                        bb.assign("this." + instField).toExpression(instField);
-//                                    });
-//                        });
                     }
                 }
             }
 
             private void applyDocComments() {
                 List<String> stuff = new ArrayList<>();
-                stuff.add("Intermediate builder of a " + AnnotationUtils.simpleName(desc.targetTypeName) + "\n");
+                stuff.add("Intermediate builder of a " + AnnotationUtils.simpleName(desc.targetTypeName) + ".\n");
                 if (!used.isEmpty()) {
                     stuff.add("<h3>Already Set Fields</h3>\n");
                     stuff.add("<ul>\n");
                     for (FieldDescriptor fd : used) {
                         stuff.add(fd.toBulletPoint());
                     }
-                    stuff.add("</ul>\n");
+                    stuff.add("</ul>");
                 }
                 if (!unused.isEmpty()) {
                     stuff.add("\n<h3>Remaining Fields</h3>\n");
@@ -284,7 +305,7 @@ public class CartesianGenerator {
                     for (FieldDescriptor fd : unused) {
                         stuff.add(fd.toBulletPoint());
                     }
-                    stuff.add("</ul>\n");
+                    stuff.add("</ul>");
                 }
                 if (!optional.isEmpty()) {
                     stuff.add("<h3>Optional Fields</h3>\n");
@@ -292,9 +313,8 @@ public class CartesianGenerator {
                     for (FieldDescriptor fd : optional) {
                         stuff.add(fd.toBulletPoint());
                     }
-                    stuff.add("</ul>\n");
+                    stuff.add("</ul>");
                 }
-
                 target.docComment((Object[]) stuff.toArray(new String[stuff.size()]));
             }
 
@@ -365,15 +385,19 @@ public class CartesianGenerator {
                     List<String> methodGenerics = desc.genericsRequiredFor(Collections.singleton(last));
                     methodGenerics.removeAll(generics);
                     String typeToBuild = desc.targetTypeName;
+                    String retGenerics = desc.fullTargetGenerics();
                     target.method("buildWith" + capitalize(last.fieldName))
                             .withModifier(Modifier.PUBLIC, Modifier.FINAL)
-                            .addArgument(last.typeName(), last.fieldName)
+                            .addArgument(last.parameterTypeName(), last.fieldName)
+                            .conditionally(last.canBeVarargs(), mb -> {
+                                mb.annotatedWith(SafeVarargs.class.getName()).closeAnnotation();
+                            })
                             .conditionally(!methodGenerics.isEmpty(), mg -> {
                                 for (String g : methodGenerics) {
                                     mg.withTypeParam(desc.withGenericBound(g));
                                 }
                             })
-                            .returning(typeToBuild)
+                            .returning(typeToBuild + retGenerics)
                             .conditionally(!desc.thrownTypes().isEmpty(), mb -> {
                                 for (TypeMirror tm : desc.thrownTypes()) {
                                     mb.throwing(tm.toString());
@@ -427,7 +451,7 @@ public class CartesianGenerator {
                                             String instField = desc.uniquify("instance");
                                             nb.withArgument("this." + instField);
                                         }
-                                        nb.ofType(typeToBuild + (generics.isEmpty() ? "" : "<>"));
+                                        nb.ofType(typeToBuild + (retGenerics.isEmpty() ? "" : "<>"));
                                     });
                                 }
                             });
@@ -451,35 +475,104 @@ public class CartesianGenerator {
                                     optional)
                     );
 
+                    String builderName = oneBuilderName(including(fd, used), omitting(fd, unused));
+//
+//                    List<String> methodGenerics = desc.genericSignatureForBuilderWith(combine(optional, including(fd, used)),
+//                            GenericSignatureKind.EXPLICIT_BOUNDS);
+//
+////                    String retTypeGenerics = desc.genericSignatureForMethodAdding(fd, used);
+//                    String retTypeGenerics = desc.builderGenericSignature(
+//                            combine(Collections.singleton(fd), used), GenericSignatureKind.IMPLICIT_BOUNDS);
+//
+//                    String retType = builderName + retTypeGenerics;
+//                    System.out.println("GEN SIG ADDINg " + fd + " " + builderName + " generics " + retTypeGenerics);
+
                     List<String> genericsForFd = desc.genericsRequiredFor(Collections.singleton(fd));
                     genericsForFd.removeAll(generics);
 
-                    String builderName = oneBuilderName(including(fd, used), omitting(fd, unused));
                     List<String> genericsSig = desc.genericsRequiredFor(combine(combine(used, Collections.singleton(fd)), optional));
-                    StringBuilder qualified = new StringBuilder(builderName);
                     StringBuilder unqualified = new StringBuilder(builderName);
                     for (String gs : genericsSig) {
                         String orig = gs;
                         gs = desc.withGenericBound(gs);
-                        if (qualified.length() == builderName.length()) {
-                            qualified.append('<');
+                        if (unqualified.length() == builderName.length()) {
                             unqualified.append('<');
                         } else {
-                            qualified.append(",");
-                            unqualified.append(",");
+                            unqualified.append(", ");
                         }
-                        qualified.append(gs);
                         unqualified.append(orig);
                     }
-                    boolean hasGenerics = qualified.length() != builderName.length();
+                    boolean hasGenerics = unqualified.length() != builderName.length();
                     if (hasGenerics) {
-                        qualified.append('>');
                         unqualified.append('>');
+                    }
+                    BuilderDescriptor sib = fd.siblingBuilder();
+                    if (sib != null) {
+                        String name;
+                        if (!sib.isSamePackage(desc)) {
+                            name = sib.packageName() + "." + sib.builderName;
+                        } else {
+                            name = sib.builderName;
+                        }
+                        String ifaceName;
+                        if (!sib.thrownTypes().isEmpty()) {
+                            ifaceName = sib.builderName + "Applier";
+                            if (appliersGenerated.add(ifaceName)) {
+                                parent.innerClass(sib.builderName + "Applier")
+                                        .toInterface()
+                                        .docComment("Function-like interface for methods that instantiate a builder ",
+                                                "which captures the exception signature of ", sib.targetTypeName + "'s constructor.")
+                                        .annotatedWith(FunctionalInterface.class.getName()).closeAnnotation()
+                                        .withModifier(Modifier.PUBLIC)
+                                        .method("apply", ifb -> {
+                                            for (TypeMirror th : sib.thrownTypes()) {
+                                                ifb.throwing(th.toString());
+                                            }
+                                            ifb.addArgument(name, "bldr")
+                                                    .returning(fd.typeName());
+//                                            ifb.closeMethod();
+                                        })
+                                        .build();
+                            }
+                        } else {
+                            ifaceName = "Function<? super " + name + ", ? extends "
+                                    + fd.typeName() + ">";
+                        }
+
+                        target.importing(Function.class);
+                        target.method("with" + capitalize(fd.fieldName))
+                                .withModifier(Modifier.PUBLIC, Modifier.FINAL)
+                                .addArgument(ifaceName, fd.fieldName + "BuilderApplier")
+                                .conditionally(fd.canBeVarargs(), mb -> {
+                                    mb.annotatedWith(SafeVarargs.class.getName()).closeAnnotation();
+                                })
+                                //                                .addArgument(fd.typeName(), fd.fieldName)
+                                .docComment(fd.setterJavadoc())
+                                .conditionally(!genericsForFd.isEmpty(), mb -> {
+                                    for (String g : genericsForFd) {
+                                        mb.withTypeParam(desc.withGenericBound(g));
+                                    }
+                                })
+                                .conditionally(!sib.thrownTypes().isEmpty(), mb -> {
+                                    for (TypeMirror th : sib.thrownTypes()) {
+                                        mb.throwing(th.toString());
+                                    }
+                                })
+                                .returning(unqualified.toString())
+                                .body(bb -> {
+                                    String b = desc.uniquify("builder");
+                                    bb.declare(b).initializedWithNew().ofType(name).as(name);
+                                    bb.returningInvocationOf("with" + capitalize(fd.fieldName))
+                                            .withArgumentFromInvoking("apply")
+                                            .withArgument(b)
+                                            .on(fd.fieldName + "BuilderApplier")
+                                            .onThis();
+                                });
                     }
 
                     target.method("with" + capitalize(fd.fieldName))
                             .withModifier(Modifier.PUBLIC, Modifier.FINAL)
-                            .addArgument(fd.typeName(), fd.fieldName)
+                            .addArgument(fd.parameterTypeName(), fd.fieldName)
                             .docComment(fd.setterJavadoc())
                             .conditionally(!genericsForFd.isEmpty(), mb -> {
                                 for (String g : genericsForFd) {
@@ -494,7 +587,7 @@ public class CartesianGenerator {
                                                 nb.withStringConcatentationArgument(fd.fieldName)
                                                         .append(" may not be null.")
                                                         .endConcatenation().ofType("IllegalArgumentException");
-                                            });
+                                            }).endIf();
                                 }
                                 if (!fd.constraints.isEmpty()) {
                                     target.importing(Consumer.class);
@@ -503,7 +596,7 @@ public class CartesianGenerator {
                                             .body().andThrow()
                                             .withArgument("_msg")
                                             .ofType("IllegalArgumentException")
-                                            .as("Consumer<String>");
+                                            .as("Consumer<? super String>");
 
                                     for (ConstraintGenerator c : fd.constraints) {
                                         c.generate(fd.fieldName, "__failer", "accept", desc.utils(), bb);

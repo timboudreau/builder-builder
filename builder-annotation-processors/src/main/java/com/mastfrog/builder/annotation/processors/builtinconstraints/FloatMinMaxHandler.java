@@ -89,7 +89,10 @@ public class FloatMinMaxHandler implements ConstraintHandler {
             bb.iff().value().expression(fieldVariableName).isGreaterThan(max)
                     .invoke(addMethodName)
                     .withStringConcatentationArgument(fieldVariableName)
-                    .append(" must be less than or equal to ").append(max).endConcatenation().on(problemsListVariableName)
+                    .append(" must be less than or equal to ")
+                    .append(max)
+                    .append(" but is ").appendExpression(fieldVariableName)
+                    .endConcatenation().on(problemsListVariableName)
                     .endIf();
         }
 
@@ -125,6 +128,7 @@ public class FloatMinMaxHandler implements ConstraintHandler {
                     .withStringConcatentationArgument(fieldVariableName)
                     .append(" must be greater than or equal to ")
                     .append(min)
+                    .append(" but is ").appendExpression(fieldVariableName)
                     .endConcatenation()
                     .on(problemsListVariableName)
                     .endIf();

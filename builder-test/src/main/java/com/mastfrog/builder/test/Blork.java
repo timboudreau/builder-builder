@@ -26,11 +26,13 @@ package com.mastfrog.builder.test;
 import com.mastfrog.builder.annotations.BuilderStyles;
 import com.mastfrog.builder.annotations.GenerateBuilder;
 import com.mastfrog.builder.annotations.Nullable;
+import com.mastfrog.builder.annotations.constraint.CollectionConstraint;
 import com.mastfrog.builder.annotations.constraint.LongMax;
 import com.mastfrog.builder.annotations.constraint.LongMin;
+import com.mastfrog.builder.annotations.constraint.StringPattern;
 import java.io.IOException;
-import java.io.Serializable;
 import java.time.temporal.TemporalAccessor;
+import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 
@@ -38,17 +40,21 @@ import java.util.function.Consumer;
  *
  * @author Tim Boudreau
  */
-public class Blork<T, R extends TemporalAccessor, M extends Appendable & Map<T,R>> {
+public class Blork<T, R extends TemporalAccessor, M extends Appendable & CharSequence> {
 
     private final long count;
     private final R theR;
     private final String name;
     private final T theTee;
-    private final Class<? super T> tType;
+    private final Class<? extends T> tType;
 
-    @GenerateBuilder(styles = BuilderStyles.PACKAGE_PRIVATE)
-    Blork(Class<? super T> tType, T theTee, String name, R theR, @LongMax(53) @LongMin(1) long count,
-            Consumer<? super M> consumer)
+    @GenerateBuilder(styles = BuilderStyles.FLAT)
+    Blork(Class<? extends T> tType, T theTee,
+            @StringPattern(maxLength = 24, minLength = 24, value = "^[\\d_]+$") String name, 
+            R theR,
+            @LongMax(53) @LongMin(1) long count,
+            ComplexThing complex,
+            @CollectionConstraint(minSize=3, maxSize=16, forbidNullValues = true) List<M> emmm)
             throws IOException, ClassNotFoundException {
         this.tType = tType;
         this.theTee = theTee;

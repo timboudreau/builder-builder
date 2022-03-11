@@ -26,6 +26,7 @@ package com.mastfrog.builder.annotation.processors;
 import com.mastfrog.annotation.AnnotationUtils;
 import static com.mastfrog.annotation.AnnotationUtils.capitalize;
 import static com.mastfrog.annotation.AnnotationUtils.simpleName;
+import static com.mastfrog.builder.annotation.processors.CartesianGenerator.combine;
 import com.mastfrog.builder.annotation.processors.spi.ConstraintGenerator;
 import com.mastfrog.java.vogon.ClassBuilder;
 import com.mastfrog.java.vogon.ClassBuilder.BlockBuilderBase;
@@ -37,6 +38,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import static java.util.Collections.sort;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -52,6 +54,8 @@ import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
+import javax.lang.model.type.ArrayType;
+import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
 import javax.tools.JavaFileObject;
 
@@ -85,7 +89,7 @@ final class BuilderDescriptors {
             }
         }
     }
-    static final String[] PRIMITIVE_TYPES = {
+    static final String[] PRIMITIVE_AND_BOXED_TYPES = {
         Byte.TYPE.getName(),
         Byte.class.getName(),
         Short.TYPE.getName(),
@@ -105,6 +109,17 @@ final class BuilderDescriptors {
         Void.TYPE.getName(),
         Void.class.getName(),};
 
+    static final String[] PRIMITIVE_TYPES = {
+        Byte.TYPE.getName(),
+        Short.TYPE.getName(),
+        Integer.TYPE.getName(),
+        Long.TYPE.getName(),
+        Character.TYPE.getName(),
+        Float.TYPE.getName(),
+        Double.TYPE.getName(),
+        Boolean.TYPE.getName(),
+        Void.TYPE.getName(),};
+
     static final String[] BOOLEAN_TYPES = {
         Boolean.TYPE.getName(),
         Boolean.class.getName()
@@ -116,6 +131,21 @@ final class BuilderDescriptors {
             ab.addArgument("value", BuilderAnnotationProcessor.class.getName());
         });
         return cb;
+    }
+
+    static String composeGenericSig(Collection<? extends String> strings) {
+        if (strings.isEmpty()) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder();
+        for (String s : strings) {
+            if (sb.length() != 0) {
+                sb.append(", ");
+            }
+            sb.append(s);
+        }
+        String result = sb.insert(0, '<').append('>').toString();
+        return result;
     }
 
     public class BuilderDescriptor {
@@ -163,6 +193,14 @@ final class BuilderDescriptors {
             System.out.println("\n\n--------- END TYPE ANALYSIS --------\n");
         }
 
+        public String targetFqn() {
+            return packageName() + "." + targetTypeName;
+        }
+
+        public boolean isSamePackage(BuilderDescriptor other) {
+            return other == this || utils.packageName(origin).equals(utils.packageName(other.origin));
+        }
+
         public String withGenericBound(String generic) {
             return generics.nameWithBound(generic);
         }
@@ -191,6 +229,102 @@ final class BuilderDescriptors {
                     cursor++;
                 }
             }
+        }
+
+        public String initialGenericsSig(GenericSignatureKind kind) {
+            if (genericsRequiredFor(this.optionalFields()).isEmpty()) {
+                return "";
+            }
+            return composeGenericSig(initialGenerics(kind));
+        }
+
+        public List<String> initialGenerics(GenericSignatureKind kind) {
+            List<String> result;
+            switch (kind) {
+                case EXPLICIT_BOUNDS:
+                    return fullSignatures(genericsRequiredFor(this.optionalFields()));
+                case IMPLICIT_BOUNDS:
+                case INFERRED_BOUNDS:
+                    return genericsRequiredFor(this.optionalFields());
+                default:
+                    throw new AssertionError(kind);
+            }
+        }
+
+        private List<String> fullSignatures(Collection<? extends String> of) {
+            List<String> result = new ArrayList<>(of.size());
+            for (String o : of) {
+                result.add(generics.nameWithBound(o));
+            }
+            return result;
+        }
+
+        public List<String> genericSignatureForBuilderWith(Collection<? extends FieldDescriptor> c, GenericSignatureKind kind) {
+            List<String> result = generics.genericNamesRequiredFor(combine(c, optionalFields()));
+            switch(kind) {
+                case EXPLICIT_BOUNDS :
+                    return fullSignatures(result);
+                default :
+                    return result;
+            }
+        }
+
+        public String builderGenericSignature(Collection<? extends FieldDescriptor> c, GenericSignatureKind k) {
+            List<String> result = generics.genericNamesRequiredFor(combine(c, optionalFields()));
+            switch(k) {
+                case EXPLICIT_BOUNDS :
+                    return composeGenericSig(fullSignatures(result));
+                case IMPLICIT_BOUNDS :
+                    return composeGenericSig(result);
+                case INFERRED_BOUNDS :
+                    return result.isEmpty() ? "" : "<>";
+                default :
+                    throw new AssertionError(k);
+            }
+        }
+
+        public String genericSignatureForMethodAdding(FieldDescriptor fd, Collection<? extends FieldDescriptor> alreadyPresent) {
+            List<String> all = generics.genericNamesRequiredFor(Collections.singleton(fd));
+            if (all.isEmpty()) {
+                return "";
+            }
+            // These will already be present
+            all.removeAll(generics.genericNamesRequiredFor(this.optionalFields()));
+            all.removeAll(generics.genericNamesRequiredFor(alreadyPresent));
+            if (all.isEmpty()) {
+                return "";
+            }
+            return composeGenericSig(all);
+        }
+
+        public String fullTargetGenerics() {
+            List<String> gens = genericsRequiredFor(this.paramForVar.values());
+            if (gens.isEmpty()) {
+                return "";
+            }
+            StringBuilder sb = new StringBuilder();
+            for (String g : gens) {
+                if (sb.length() > 0) {
+                    sb.append(", ");
+                }
+                sb.append(g);
+            }
+            return sb.insert(0, '<').append('>').toString();
+        }
+
+        public String fullTargetGenericSignature() {
+            List<String> gens = genericsRequiredFor(this.paramForVar.values());
+            if (gens.isEmpty()) {
+                return "";
+            }
+            StringBuilder sb = new StringBuilder();
+            for (String g : gens) {
+                if (sb.length() > 0) {
+                    sb.append(", ");
+                }
+                sb.append(withGenericBound(g));
+            }
+            return sb.insert(0, '<').append('>').toString();
         }
 
         Element[] elements() {
@@ -313,6 +447,7 @@ final class BuilderDescriptors {
                     .docComment("Generated builder from annotations on " + origin)
                     .withModifier(Modifier.FINAL).withModifier(Modifier.PUBLIC)
                     .autoToString()) //                    .generateDebugLogCode()
+                    .withTypeParameters(fullSignatures(generics.genericNamesRequiredFor(paramForVar.values())))
                     ;
 
             indexPrimitives();
@@ -331,9 +466,10 @@ final class BuilderDescriptors {
             for (Map.Entry<VariableElement, FieldDescriptor> e : paramForVar.entrySet()) {
                 e.getValue().generate(cb);
             }
+            List<String> gens = generics.genericNamesRequiredFor(paramForVar.values());
             ClassBuilder.MethodBuilder<ClassBuilder<String>> mb = cb.method("build")
                     .withModifier(Modifier.PUBLIC, Modifier.FINAL)
-                    .returning(targetTypeName)
+                    .returning(targetTypeName + composeGenericSig(gens))
                     .conditionally(!thrownTypes().isEmpty(), mmb -> {
                         for (TypeMirror tm : thrownTypes()) {
                             mmb.throwing(tm.toString());
@@ -360,7 +496,8 @@ final class BuilderDescriptors {
                         for (Map.Entry<VariableElement, FieldDescriptor> e : paramForVar.entrySet()) {
                             nb.withArgumentFromField(e.getValue().fieldName).ofThis();
                         }
-                        nb.ofType(targetTypeName);
+                        String withGenerics = this.initialGenericsSig(GenericSignatureKind.INFERRED_BOUNDS);
+                        nb.ofType(targetTypeName + (gens.isEmpty() ? "" : "<>"));
                     });
                 });
             }
@@ -383,14 +520,22 @@ final class BuilderDescriptors {
             if (this.allPrimitivesMask != 0 || hcgs) {
                 String probName = uniquify("problems");
                 bb.declare(probName).initializedWithNew()
-                        .withArgument(4)
+                        .withArgument(paramForVar.size())
                         .ofType(ArrayList.class.getName() + "<>").as(List.class.getName() + "<String>");
 
                 ClassBuilder.IfBuilder<?> iff = bb.iff().booleanExpression("(this." + SET_PRIM_FIELDS + " & " + this.allPrimitivesMask + "L) != " + this.allPrimitivesMask + "L");
                 for (FieldDescriptor fd : paramForVar.values()) {
-                    fd.generateValidityCheck(iff, probName);
+                    if (fd.isPrimitive()) {
+                        fd.generateValidityCheck(iff, probName);
+                    }
                 }
                 iff.endIf();
+                for (FieldDescriptor fd : paramForVar.values()) {
+                    if (!fd.isPrimitive()) {
+                        fd.generateValidityCheck(bb, probName);
+                    }
+                }
+
 
                 ClassBuilder.IfBuilder<?> conif = bb.iff().invoke("isEmpty").on(probName).isTrue().endCondition();
                 for (FieldDescriptor fd : paramForVar.values()) {
@@ -433,8 +578,25 @@ final class BuilderDescriptors {
                 this.constraints = constraints;
             }
 
+            public BuilderDescriptor siblingBuilder() {
+                for (Map.Entry<Element, BuilderDescriptor> e: BuilderDescriptors.this.descs.entrySet()) {
+                    if (e.getValue() == BuilderDescriptor.this) {
+                        continue;
+                    }
+                    // XXX this comparison may compare differently named generics and fail
+                    if (e.getValue().targetFqn().equals(var.asType().toString())) {
+                        return e.getValue();
+                    }
+                }
+                return null;
+            }
+
             public String get() {
                 return fieldName;
+            }
+
+            public boolean isReallyPrimitive() {
+                return var.asType().getClass().getName().startsWith("Primitive");
             }
 
             private int primitiveIndex() {
@@ -450,7 +612,7 @@ final class BuilderDescriptors {
                             .returning(true).endBlock();
                 } else if (isPrimitive()) {
                     sw.inStringLiteralCase(fieldName)
-                            .returning("( " + setMaskName + " & 1L << " + primitiveIndex() + ") != 0L")
+                            .returning("( " + setMaskName + " & " + (1L << primitiveIndex()) + ") != 0L")
                             .endBlock();
                 } else {
                     sw.inStringLiteralCase(fieldName)
@@ -462,6 +624,19 @@ final class BuilderDescriptors {
             public FieldDescriptor withFieldName(String fieldName) {
                 this.fieldName = fieldName;
                 return this;
+            }
+
+            boolean canBeVarargs() {
+                return this.var.asType().getKind() == TypeKind.ARRAY && this.var.asType() instanceof ArrayType;
+            }
+
+            String parameterTypeName() {
+                if (canBeVarargs()) {
+                    ArrayType at = (ArrayType) this.var.asType();
+                    System.out.println("USE VARARGS " + at.getComponentType() + "...");
+                    return at.getComponentType() + "...";
+                }
+                return typeName();
             }
 
             String typeName() {
@@ -535,19 +710,29 @@ final class BuilderDescriptors {
                 if (createField) {
                     cb.field(fieldName).withModifier(Modifier.PRIVATE).ofType(tn);
                 }
+                String gens = "";
+                if (runConstraints) {
+                    gens = BuilderDescriptor.this.builderGenericSignature(paramForVar.values(), GenericSignatureKind.IMPLICIT_BOUNDS);
+                } else {
+                    gens = BuilderDescriptor.this.builderGenericSignature(paramForVar.values(), GenericSignatureKind.IMPLICIT_BOUNDS);
+                }
                 cb.method("with" + capitalize(fieldName))
                         .withModifier(Modifier.PUBLIC, Modifier.FINAL)
-                        .addArgument(tn, fieldName)
+                        .addArgument(parameterTypeName(), fieldName)
+                        .conditionally(canBeVarargs(), mb -> {
+                            mb.annotatedWith(SafeVarargs.class.getName()).closeAnnotation();
+                        })
                         .docComment(setterJavadoc())
-                        .returning(cb.className())
+                        .returning(cb.className() + gens)
                         .body(bb -> {
                             boolean prim = isPrimitive();
+                            bb.lineComment("Primitive type checks needed? " + prim);
                             if (!prim && !optional) {
                                 bb.ifNull(fieldName, ib -> {
                                     ib.andThrow(nb -> {
                                         nb.withArgument(sc -> {
                                             sc.stringConcatenation().expression(fieldName)
-                                                    .append(" may not be null")
+                                                    .append(" may not be null.")
                                                     .endConcatenation();
 
                                         }).ofType("IllegalArgumentException");
@@ -587,7 +772,7 @@ final class BuilderDescriptors {
 
             boolean isPrimitive() {
                 TypeMirror type = var.asType();
-                for (String tp : PRIMITIVE_TYPES) {
+                for (String tp : PRIMITIVE_AND_BOXED_TYPES) {
                     if (utils.isAssignable(type, tp)) {
                         return true;
                     }

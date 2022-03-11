@@ -21,35 +21,31 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-package com.mastfrog.builder.test.blah;
+package com.mastfrog.builder.annotations.metadata;
 
-import com.mastfrog.builder.test.ComplexThing;
-import com.mastfrog.builder.test.ComplexThing.OtherThing;
-import com.mastfrog.builder.test.ComplexThingBuilder;
-import com.mastfrog.builder.test.BlorkBuilder;
-import java.util.Collections;
+import com.mastfrog.builder.annotations.BuilderStyles;
 
 /**
+ * Annotation which appears on the <i>generated</i> annotations, which this
+ * library can use to identify builders for types on the classpath which are
+ * used as components of the builder it is generating, so that those builders
+ * can be incorporated into the control flow.
  *
  * @author Tim Boudreau
  */
-public class BT {
+public @interface GeneratedBuilder {
 
-    public static void main(String[] args) throws java.io.IOException,
-            java.lang.ClassNotFoundException, java.rmi.UnknownHostException {
+    int codeGenerationVersion();
 
-//        new BlorkBuilder().withComplex((ComplexThingBuilder bldr) ->
-//            bldr.withContents(Collections.emptySet()).withIsPretty(true)
-//                    .withWeight(5F).withId(23).withName("goo")
-//                    .withOther(new OtherThing("whee")).buildWithWhen(5L)
-//        );
-//
-//        ComplexThingBuilder ctb = new ComplexThingBuilder();
-//        ComplexThing x = ctb.withName("Pooger").withId(23).withIsPretty(true)
-//                .withContents(Collections.emptySet())
-//                .withOther(new OtherThing("foo"))
-//                .withWhen(5)
-//                .buildWithWeight(5F);
-//        System.out.println("Have an x " + x);
-    }
+    BuilderStyles[] styles();
+
+    Class<?> value();
+
+    String[] requiredParameterNames();
+
+    String[] requiredParameterTypes();
+
+    String[] optionalParameterNames();
+
+    String[] optionalParameterTypes();
 }

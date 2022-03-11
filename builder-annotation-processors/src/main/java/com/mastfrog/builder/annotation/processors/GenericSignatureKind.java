@@ -21,35 +21,27 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-package com.mastfrog.builder.test.blah;
-
-import com.mastfrog.builder.test.ComplexThing;
-import com.mastfrog.builder.test.ComplexThing.OtherThing;
-import com.mastfrog.builder.test.ComplexThingBuilder;
-import com.mastfrog.builder.test.BlorkBuilder;
-import java.util.Collections;
+package com.mastfrog.builder.annotation.processors;
 
 /**
+ * Flavors of generic signature that can be generated.
  *
  * @author Tim Boudreau
  */
-public class BT {
+public enum GenericSignatureKind {
 
-    public static void main(String[] args) throws java.io.IOException,
-            java.lang.ClassNotFoundException, java.rmi.UnknownHostException {
-
-//        new BlorkBuilder().withComplex((ComplexThingBuilder bldr) ->
-//            bldr.withContents(Collections.emptySet()).withIsPretty(true)
-//                    .withWeight(5F).withId(23).withName("goo")
-//                    .withOther(new OtherThing("whee")).buildWithWhen(5L)
-//        );
-//
-//        ComplexThingBuilder ctb = new ComplexThingBuilder();
-//        ComplexThing x = ctb.withName("Pooger").withId(23).withIsPretty(true)
-//                .withContents(Collections.emptySet())
-//                .withOther(new OtherThing("foo"))
-//                .withWhen(5)
-//                .buildWithWeight(5F);
-//        System.out.println("Have an x " + x);
-    }
+    /**
+     * Generics, if present, are reduced to &lt;&gt; - used for generating
+     * return type strings.
+     */
+    INFERRED_BOUNDS,
+    /**
+     * Generics with signatures intact and all bounds, e.g.
+     * &lt;Foo extends Bar, Baz extends Hoo &amp; Hah&gt;.
+     */
+    EXPLICIT_BOUNDS,
+    /**
+     * Generics with bounds elided, e.g. &lt;Foo, Baz&gt;
+     */
+    IMPLICIT_BOUNDS,
 }
