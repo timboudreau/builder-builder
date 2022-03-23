@@ -21,7 +21,6 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-
 package com.mastfrog.builder.test;
 
 /**
@@ -40,5 +39,12 @@ public class Whoozit {
         this.value = value;
         this.fraction = fraction;
         this.thing = thing;
+    }
+
+    @Override
+    public String toString() {
+        return "Whoozit{" + "name=" + name + ", value=" + value
+                + ", fraction=" + fraction + ", thing=" + thing
+                + '}';
     }
 }

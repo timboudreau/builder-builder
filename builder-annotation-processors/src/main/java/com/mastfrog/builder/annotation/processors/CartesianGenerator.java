@@ -29,6 +29,8 @@ import static com.mastfrog.annotation.AnnotationUtils.simpleName;
 import com.mastfrog.builder.annotation.processors.BuilderDescriptors.BuilderDescriptor;
 import com.mastfrog.builder.annotation.processors.BuilderDescriptors.BuilderDescriptor.FieldDescriptor;
 import static com.mastfrog.builder.annotation.processors.BuilderDescriptors.addGeneratedAnnotation;
+import static com.mastfrog.builder.annotation.processors.Utils.combine;
+import static com.mastfrog.builder.annotation.processors.Utils.including;
 import com.mastfrog.builder.annotation.processors.spi.ConstraintGenerator;
 import com.mastfrog.java.vogon.ClassBuilder;
 import java.util.ArrayList;
@@ -62,45 +64,6 @@ public class CartesianGenerator {
         return new BuilderContext(el, desc).build();
     }
 
-    static List<BuilderDescriptors.BuilderDescriptor.FieldDescriptor> sorted(
-            Collection<? extends BuilderDescriptors.BuilderDescriptor.FieldDescriptor> c) {
-        List<BuilderDescriptors.BuilderDescriptor.FieldDescriptor> result = new ArrayList<>(c);
-        Collections.sort(result);
-        return result;
-    }
-
-    static Set<BuilderDescriptors.BuilderDescriptor.FieldDescriptor> omitting(
-            BuilderDescriptors.BuilderDescriptor.FieldDescriptor one,
-            Set<BuilderDescriptors.BuilderDescriptor.FieldDescriptor> all) {
-        Set<BuilderDescriptors.BuilderDescriptor.FieldDescriptor> result = new HashSet<>(all);
-        result.remove(one);
-        return result;
-    }
-
-    static Set<BuilderDescriptors.BuilderDescriptor.FieldDescriptor> omitting(
-            Set<BuilderDescriptors.BuilderDescriptor.FieldDescriptor> toOmit,
-            Set<BuilderDescriptors.BuilderDescriptor.FieldDescriptor> all) {
-        Set<BuilderDescriptors.BuilderDescriptor.FieldDescriptor> result = new HashSet<>(all);
-        result.removeAll(toOmit);
-        return result;
-    }
-
-    static Set<BuilderDescriptors.BuilderDescriptor.FieldDescriptor> including(
-            BuilderDescriptors.BuilderDescriptor.FieldDescriptor one,
-            Set<BuilderDescriptors.BuilderDescriptor.FieldDescriptor> all) {
-        Set<BuilderDescriptors.BuilderDescriptor.FieldDescriptor> result = new HashSet<>(all);
-        result.add(one);
-        return result;
-    }
-
-    static Set<BuilderDescriptors.BuilderDescriptor.FieldDescriptor> combine(
-            Collection<? extends BuilderDescriptors.BuilderDescriptor.FieldDescriptor> a,
-            Collection<? extends BuilderDescriptors.BuilderDescriptor.FieldDescriptor> b) {
-        Set<BuilderDescriptors.BuilderDescriptor.FieldDescriptor> result = new HashSet<>(a);
-        result.addAll(b);
-        return result;
-    }
-
     private static String oneBuilderName(String rootBuilderName,
             Collection<? extends FieldDescriptor> used,
             Collection<? extends FieldDescriptor> unused) {
@@ -108,11 +71,11 @@ public class CartesianGenerator {
             return rootBuilderName;
         }
         StringBuilder sb = new StringBuilder(rootBuilderName).append("With");
-        for (FieldDescriptor fd : sorted(used)) {
+        for (FieldDescriptor fd : Utils.sorted(used)) {
             sb.append(capitalize(fd.fieldName));
         }
         StringBuilder sb2 = new StringBuilder(rootBuilderName).append("Sans");
-        for (FieldDescriptor fd : sorted(unused)) {
+        for (FieldDescriptor fd : Utils.sorted(unused)) {
             sb2.append(capitalize(fd.fieldName));
         }
         if (sb2.length() < sb.length()) {
@@ -151,11 +114,11 @@ public class CartesianGenerator {
                 return desc.builderName;
             }
             StringBuilder sb = new StringBuilder(desc.builderName).append("With");
-            for (FieldDescriptor fd : sorted(used)) {
+            for (FieldDescriptor fd : Utils.sorted(used)) {
                 sb.append(capitalize(fd.fieldName));
             }
             StringBuilder sb2 = new StringBuilder(desc.builderName).append("Sans");
-            for (FieldDescriptor fd : sorted(unused)) {
+            for (FieldDescriptor fd : Utils.sorted(unused)) {
                 sb2.append(capitalize(fd.fieldName));
             }
             if (sb2.length() < sb.length()) {
@@ -169,11 +132,11 @@ public class CartesianGenerator {
                 Set<FieldDescriptor> used,
                 Set<FieldDescriptor> required, Set<FieldDescriptor> optional) {
 
-            String nm = oneBuilderName(including(applying, used), omitting(applying, required));
+            String nm = oneBuilderName(Utils.including(applying, used), Utils.omitting(applying, required));
             OneProductBuilder opb = cartesians.get(nm);
             if (opb == null) {
-                opb = new OneProductBuilder(parent, including(applying, used),
-                        omitting(applying, required), optional);
+                opb = new OneProductBuilder(parent, Utils.including(applying, used),
+                        Utils.omitting(applying, required), optional);
                 cartesians.put(nm, opb);
                 return opb;
             }
@@ -200,7 +163,7 @@ public class CartesianGenerator {
                                         .body().endBlock();
                             });
                         });
-                parent.generateDebugLogCode();
+//                parent.generateDebugLogCode();
                 desc.decorateClassWithConstraints(parent);
                 if (desc.instanceType != null) {
                     String instField = desc.uniquify("instance");
@@ -422,7 +385,8 @@ public class CartesianGenerator {
                                             .as("Consumer<String>");
 
                                     for (ConstraintGenerator c : last.constraints) {
-                                        c.generate(last.fieldName, "__failer", "accept", desc.utils(), bb);
+                                        c.generate(last.fieldName, "__failer", "accept", desc.utils(), bb,
+                                                last.fieldName);
                                     }
                                 }
                                 if (desc.instanceType != null) {
@@ -459,7 +423,7 @@ public class CartesianGenerator {
             }
 
             private void generateOptionalSetters() {
-                for (FieldDescriptor fd : sorted(optional)) {
+                for (FieldDescriptor fd : Utils.sorted(optional)) {
                     fd.generate(target, false, true);
                 }
             }
@@ -468,14 +432,14 @@ public class CartesianGenerator {
                 if (unused.size() == 1) {
                     return;
                 }
-                for (FieldDescriptor fd : sorted(unused)) {
-                    List<FieldDescriptor> args = sorted(
+                for (FieldDescriptor fd : Utils.sorted(unused)) {
+                    List<FieldDescriptor> args = Utils.sorted(
                             combine(
                                     including(fd, used),
                                     optional)
                     );
 
-                    String builderName = oneBuilderName(including(fd, used), omitting(fd, unused));
+                    String builderName = oneBuilderName(Utils.including(fd, used), Utils.omitting(fd, unused));
 //
 //                    List<String> methodGenerics = desc.genericSignatureForBuilderWith(combine(optional, including(fd, used)),
 //                            GenericSignatureKind.EXPLICIT_BOUNDS);
@@ -490,7 +454,7 @@ public class CartesianGenerator {
                     List<String> genericsForFd = desc.genericsRequiredFor(Collections.singleton(fd));
                     genericsForFd.removeAll(generics);
 
-                    List<String> genericsSig = desc.genericsRequiredFor(combine(combine(used, Collections.singleton(fd)), optional));
+                    List<String> genericsSig = desc.genericsRequiredFor(Utils.combine(combine(used, Collections.singleton(fd)), optional));
                     StringBuilder unqualified = new StringBuilder(builderName);
                     for (String gs : genericsSig) {
                         String orig = gs;
@@ -599,7 +563,7 @@ public class CartesianGenerator {
                                             .as("Consumer<? super String>");
 
                                     for (ConstraintGenerator c : fd.constraints) {
-                                        c.generate(fd.fieldName, "__failer", "accept", desc.utils(), bb);
+                                        c.generate(fd.fieldName, "__failer", "accept", desc.utils(), bb, fd.fieldName);
                                     }
                                 }
                                 OneProductBuilder opb

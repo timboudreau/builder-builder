@@ -60,7 +60,7 @@ public class BuilderAnnotationProcessor extends AbstractProcessor {
     private BuilderDescriptors descs;
     private ConstraintHandlers handlers;
     static final String ANNO = "com.mastfrog.builder.annotations.GenerateBuilder";
-    static final String NULLABLE = "com.mastfrog.builder.annotations.Nullable";
+    public static final String NULLABLE = "com.mastfrog.builder.annotations.Nullable";
 
     static {
         AnnotationUtils.forceLogging();

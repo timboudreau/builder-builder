@@ -21,43 +21,43 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-package com.mastfrog.builder.annotations.constraint;
+package com.mastfrog.builder.test;
 
-import static java.lang.annotation.ElementType.PARAMETER;
-import java.lang.annotation.Retention;
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
-import java.lang.annotation.Target;
+import com.mastfrog.builder.annotations.GenerateBuilder;
 
 /**
- * Regular expression and length constraint for strings.
  *
  * @author Tim Boudreau
  */
-@Retention(RUNTIME)
-@Target(PARAMETER)
-@AppliesTo({CharSequence.class})
-public @interface StringPattern {
+public class ElevenFields {
 
-    /**
-     * An optional regular expression (must be parsable by java.util.Pattern).
-     *
-     * @return A valid regular expression
-     */
-    String value() default ".*";
+    private final byte f0;
+    private final short f1;
+    private final int f2;
+    private final long f3;
+    private final char f4;
+    private final boolean f5;
+    private final double f6;
+    private final float f7;
+    private final byte f8;
+    private final String thing;
+    private final float floater;
 
-    /**
-     * The minimum length a string should have
-     *
-     * @return A minimum length, non-negative and less than or equal to
-     * maxLength() if specified.
-     */
-    int minLength() default 0;
+    @GenerateBuilder
+    public ElevenFields(byte f0, short f1, int f2, long f3, char f4,
+            boolean f5, double f6, float f7, byte f8, String thing,
+            float floater) {
+        this.f0 = f0;
+        this.f1 = f1;
+        this.f2 = f2;
+        this.f3 = f3;
+        this.f4 = f4;
+        this.f5 = f5;
+        this.f6 = f6;
+        this.f7 = f7;
+        this.f8 = f8;
+        this.thing = thing;
+        this.floater = floater;
+    }
 
-    /**
-     * The maximum length a string should have
-     *
-     * @return The maximum length - non negative and must be greater than or
-     * equal to minLiength() if specified.
-     */
-    int maxLength() default Integer.MAX_VALUE;
 }

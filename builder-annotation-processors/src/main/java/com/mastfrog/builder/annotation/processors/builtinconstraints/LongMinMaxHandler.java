@@ -57,10 +57,10 @@ public class LongMinMaxHandler implements ConstraintHandler {
             }
         }
         if (min != null) {
-            genConsumer.accept(new MinGenerator(utils, min));
+            genConsumer.accept(new LongMinGenerator(utils, min));
         }
         if (max != null) {
-            genConsumer.accept(new MaxGenerator(utils, max));
+            genConsumer.accept(new LongMaxGenerator(utils, max));
         }
     }
 
@@ -72,23 +72,21 @@ public class LongMinMaxHandler implements ConstraintHandler {
         return LongMinMaxHandler.class.hashCode();
     }
 
-    private static class MaxGenerator implements ConstraintGenerator {
+    private static class LongMaxGenerator implements ConstraintGenerator {
 
         private final long max;
 
-        MaxGenerator(AnnotationUtils utils, AnnotationMirror max) {
+        LongMaxGenerator(AnnotationUtils utils, AnnotationMirror max) {
             this.max = utils.annotationValue(max, "value", Long.class, Long.MAX_VALUE);
         }
 
         @Override
         public <T, B extends ClassBuilder.BlockBuilderBase<T, B, X>, X> void generate(
-                String fieldVariableName, String problemsListVariableName,
-                String addMethodName, AnnotationUtils utils,
-                B bb) {
+                String fieldVariableName, String problemsListVariableName, String addMethodName, AnnotationUtils utils, B bb, String parameterName) {
             bb.lineComment(getClass().getName());
             bb.iff().value().expression(fieldVariableName).isGreaterThan(max)
                     .invoke(addMethodName)
-                    .withStringConcatentationArgument(fieldVariableName)
+                    .withStringConcatentationArgument(parameterName)
                     .append(" must be less than or equal to ").append(max)
                     .append(" but is ").appendExpression(fieldVariableName)
                     .endConcatenation().on(problemsListVariableName)
@@ -97,34 +95,32 @@ public class LongMinMaxHandler implements ConstraintHandler {
 
         @Override
         public void contributeDocComments(Consumer<String> bulletPoints) {
-            bulletPoints.accept("value must be &lt;= " + max);
+            bulletPoints.accept("value must be &lt;= <code>" + max + "</code>");
         }
 
         @Override
         public String toString() {
-            return "MaxLong(" + max + ")";
+            return getClass().getSimpleName() + "(" + max + /* " nullable " + nullable + */ ")";
         }
     }
 
-    private static class MinGenerator implements ConstraintGenerator {
+    private static class LongMinGenerator implements ConstraintGenerator {
 
         private final long min;
 
-        MinGenerator(AnnotationUtils utils, AnnotationMirror min) {
+        LongMinGenerator(AnnotationUtils utils, AnnotationMirror min) {
             this.min = utils.annotationValue(min, "value", Long.class, Long.MIN_VALUE);
         }
 
         @Override
         public <T, B extends ClassBuilder.BlockBuilderBase<T, B, X>, X>  void generate(
-                String fieldVariableName, String problemsListVariableName,
-                String addMethodName, AnnotationUtils utils,
-                B bb) {
+                String fieldVariableName, String problemsListVariableName, String addMethodName, AnnotationUtils utils, B bb, String parameterName) {
             bb.lineComment(getClass().getName());
             bb.iff().value()
                     .expression(fieldVariableName)
                     .isLessThan(min)
                     .invoke(addMethodName)
-                    .withStringConcatentationArgument(fieldVariableName)
+                    .withStringConcatentationArgument(parameterName)
                     .append(" must be greater than or equal to ")
                     .append(min)
                     .append(" but is ").appendExpression(fieldVariableName)
@@ -135,12 +131,12 @@ public class LongMinMaxHandler implements ConstraintHandler {
 
         @Override
         public void contributeDocComments(Consumer<String> bulletPoints) {
-            bulletPoints.accept("value must be &gt;= " + min);
+            bulletPoints.accept("value must be &gt;= <code>" + min + "</code>");
         }
 
         @Override
         public String toString() {
-            return "MinLong(" + min + ")";
+            return getClass().getSimpleName() + "(" + min + /* " nullable " + nullable + */ ")";
         }
     }
 }

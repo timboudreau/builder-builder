@@ -29,6 +29,8 @@ import java.util.Optional;
 import java.util.function.Function;
 
 /**
+ * Allows a custom constraint to be plugged in. The constraint class must be
+ * accessible on the class path and have a default, no-arg constructor.
  *
  * @author Tim Boudreau
  */

@@ -25,6 +25,7 @@ package com.mastfrog.builder.annotation.processors.builtinconstraints;
 
 import com.mastfrog.annotation.AnnotationUtils;
 import com.mastfrog.builder.annotation.processors.spi.ConstraintGenerator;
+import static com.mastfrog.builder.annotation.processors.spi.ConstraintGenerator.NULLABLE_ANNOTATION;
 import com.mastfrog.builder.annotation.processors.spi.ConstraintHandler;
 import com.mastfrog.java.vogon.ClassBuilder;
 import com.mastfrog.util.service.ServiceProvider;
@@ -49,18 +50,23 @@ public class IntMinMaxHandler implements ConstraintHandler {
             Consumer<ConstraintGenerator> genConsumer) {
         AnnotationMirror min = utils.findAnnotationMirror(parameterElement, INT_MIN);
         AnnotationMirror max = utils.findAnnotationMirror(parameterElement, INT_MAX);
+        boolean nullable = utils.findAnnotationMirror(parameterElement, NULLABLE_ANNOTATION) != null;
         if (min != null || max != null) {
             TypeMirror paramType = parameterElement.asType();
+            if ("int[]".equals(paramType.toString())) {
+                genConsumer.accept(new IntArrayMinMaxGenerator(utils, min, max, nullable));
+                return;
+            }
             if (!utils.isAssignable(paramType, Integer.class.getName()) && !utils.isAssignable(paramType, int.class.getName())) {
                 utils.fail("Cannot apply IntMin or IntMax to a " + paramType, parameterElement, (min == null ? min : max));
                 return;
             }
         }
         if (min != null) {
-            genConsumer.accept(new MinGenerator(utils, min));
+            genConsumer.accept(new IntMinGenerator(utils, min, nullable));
         }
         if (max != null) {
-            genConsumer.accept(new MaxGenerator(utils, max));
+            genConsumer.accept(new IntMaxGenerator(utils, max, nullable));
         }
     }
 
@@ -72,23 +78,35 @@ public class IntMinMaxHandler implements ConstraintHandler {
         return IntMinMaxHandler.class.hashCode();
     }
 
-    private static class MaxGenerator implements ConstraintGenerator {
+    private static class IntMaxGenerator implements ConstraintGenerator {
 
         private final int max;
+        private final boolean nullable;
 
-        MaxGenerator(AnnotationUtils utils, AnnotationMirror max) {
+        IntMaxGenerator(AnnotationUtils utils, AnnotationMirror max, boolean nullable) {
             this.max = utils.annotationValue(max, "value", Integer.class, Integer.MAX_VALUE);
+            this.nullable = nullable;
         }
 
         @Override
         public <T, B extends ClassBuilder.BlockBuilderBase<T, B, X>, X> void generate(
-                String fieldVariableName, String problemsListVariableName,
-                String addMethodName, AnnotationUtils utils,
-                B bb) {
-            bb.lineComment(getClass().getName());
+                String fieldVariableName, String problemsListVariableName, String addMethodName,
+                AnnotationUtils utils, B bb, String parameterName) {
+            if (nullable) {
+                ClassBuilder.IfBuilder<B> iff = bb.ifNotNull(fieldVariableName);
+                apply(fieldVariableName, problemsListVariableName, addMethodName, utils, iff, parameterName);
+                iff.endIf();
+            } else {
+                apply(fieldVariableName, problemsListVariableName, addMethodName, utils, bb, parameterName);
+            }
+        }
+
+        private <T, B extends ClassBuilder.BlockBuilderBase<T, B, X>, X> void apply(String fieldVariableName,
+                String problemsListVariableName, String addMethodName, AnnotationUtils utils, B bb,
+                String parameterName) {
             bb.iff().value().expression(fieldVariableName).isGreaterThan(max)
                     .invoke(addMethodName)
-                    .withStringConcatentationArgument(fieldVariableName)
+                    .withStringConcatentationArgument(parameterName)
                     .append(" must be less than or equal to ").append(max)
                     .append(" but is ").appendExpression(fieldVariableName)
                     .endConcatenation().on(problemsListVariableName)
@@ -97,34 +115,46 @@ public class IntMinMaxHandler implements ConstraintHandler {
 
         @Override
         public void contributeDocComments(Consumer<String> bulletPoints) {
-            bulletPoints.accept("value must be &lt;= " + max);
+            bulletPoints.accept("value must be &lt;= <code>" + max + "</code>");
         }
 
         @Override
         public String toString() {
-            return "MaxInt(" + max + ")";
+            return getClass().getSimpleName() + "(" + max + " nullable " + nullable + ")";
         }
     }
 
-    private static class MinGenerator implements ConstraintGenerator {
+    private static class IntMinGenerator implements ConstraintGenerator {
 
         private final int min;
+        private final boolean nullable;
 
-        MinGenerator(AnnotationUtils utils, AnnotationMirror min) {
+        IntMinGenerator(AnnotationUtils utils, AnnotationMirror min, boolean nullable) {
             this.min = utils.annotationValue(min, "value", Integer.class, Integer.MIN_VALUE);
+            this.nullable = nullable;
         }
 
         @Override
         public <T, B extends ClassBuilder.BlockBuilderBase<T, B, X>, X> void generate(
-                String fieldVariableName, String problemsListVariableName,
-                String addMethodName, AnnotationUtils utils,
-                B bb) {
-            bb.lineComment(getClass().getName());
+                String fieldVariableName, String problemsListVariableName, String addMethodName,
+                AnnotationUtils utils, B bb, String parameterName) {
+            if (nullable) {
+                ClassBuilder.IfBuilder<B> iff = bb.ifNotNull(fieldVariableName);
+                apply(fieldVariableName, problemsListVariableName, addMethodName, utils, iff, parameterName);
+                iff.endIf();
+            } else {
+                apply(fieldVariableName, problemsListVariableName, addMethodName, utils, bb, parameterName);
+            }
+        }
+
+        private <T, B extends ClassBuilder.BlockBuilderBase<T, B, X>, X> void apply(String fieldVariableName,
+                String problemsListVariableName, String addMethodName, AnnotationUtils utils, B bb,
+                String parameterName) {
             bb.iff().value()
                     .expression(fieldVariableName)
                     .isLessThan(min)
                     .invoke(addMethodName)
-                    .withStringConcatentationArgument(fieldVariableName)
+                    .withStringConcatentationArgument(parameterName)
                     .append(" must be greater than or equal to ")
                     .append(min)
                     .append(" but is ").appendExpression(fieldVariableName)
@@ -135,12 +165,100 @@ public class IntMinMaxHandler implements ConstraintHandler {
 
         @Override
         public void contributeDocComments(Consumer<String> bulletPoints) {
-            bulletPoints.accept("value must be &gt;= " + min);
+            bulletPoints.accept("value must be &gt;= <code>" + min + "</code>");
         }
 
         @Override
         public String toString() {
-            return "MinInt(" + min + ")";
+            return getClass().getSimpleName() + "(" + min + " nullable " + nullable + ")";
+        }
+    }
+
+    private static final class IntArrayMinMaxGenerator implements ConstraintGenerator {
+
+        private final int min;
+        private final int max;
+        private final boolean nullable;
+
+        IntArrayMinMaxGenerator(AnnotationUtils utils, AnnotationMirror min, AnnotationMirror max, boolean nullable) {
+            this.min = min == null ? Integer.MIN_VALUE : utils.annotationValue(min, "value", Integer.class, Integer.MIN_VALUE);
+            this.max = max == null ? Integer.MAX_VALUE : utils.annotationValue(max, "value", Integer.class, Integer.MAX_VALUE);
+            this.nullable = nullable;
+        }
+
+        public String toString() {
+            return getClass().getSimpleName() + "(min " + min + " max " + max + " nullable " + nullable + ")";
+        }
+
+        @Override
+        public <T, B extends ClassBuilder.BlockBuilderBase<T, B, X>, X> void generate(
+                String localFieldName, String problemsListVariableName, String addMethodName,
+                AnnotationUtils utils, B bb, String parameterName) {
+            if (nullable) {
+                ClassBuilder.IfBuilder<B> iff = bb.iff().isNotNull(localFieldName).endCondition();
+                apply(localFieldName, problemsListVariableName, addMethodName, utils, iff, parameterName);
+                iff.endIf();
+            } else {
+                apply(localFieldName, problemsListVariableName, addMethodName, utils, bb, parameterName);
+            }
+        }
+
+        private <T, B extends ClassBuilder.BlockBuilderBase<T, B, X>, X> void apply(String localFieldName,
+                String problemsListVariableName, String addMethodName, AnnotationUtils utils, B bb,
+                String parameterName) {
+            String v = "_i";
+            bb.forVar(v, fv -> {
+                fv.initializedWith(0).condition().lessThan().field("length").of(localFieldName).endCondition().running(forBlock -> {
+                    if (min != Integer.MIN_VALUE) {
+                        forBlock.iff().variable(localFieldName + "[" + v + "]").isLessThan(min)
+                                .invoke(addMethodName)
+                                .withStringConcatentationArgument("int[] param", scb -> {
+                                    scb.append(parameterName)
+                                            .append("' at index ")
+                                            .appendExpression(v)
+                                            .append(" must be >= ")
+                                            .append(min)
+                                            .append(" but is ")
+                                            .appendExpression(localFieldName + "[" + v + "]");
+
+                                })
+                                .on(problemsListVariableName)
+                                .breaking()
+                                .endIf();
+                    }
+                    if (max != Integer.MIN_VALUE) {
+                        forBlock.iff().variable(localFieldName + "[" + v + "]").isGreaterThan(max)
+                                .invoke(addMethodName)
+                                .withStringConcatentationArgument("int[] param '")
+                                .append(parameterName)
+                                .append("' at index ")
+                                .appendExpression(v)
+                                .append(" must be <= ")
+                                .append(max)
+                                .append(" but is ")
+                                .appendExpression(localFieldName + "[" + v + "]")
+                                .endConcatenation()
+                                .on(problemsListVariableName)
+                                .statement("break")
+                                .endIf();
+
+                    }
+                });
+            });
+        }
+
+        @Override
+        public void contributeDocComments(Consumer<String> bulletPoints) {
+            if (nullable) {
+                bulletPoints.accept("Parameter is optional.");
+            }
+            bulletPoints.accept("All values must be >= " + min);
+            bulletPoints.accept("All values must be <= " + max);
+        }
+
+        @Override
+        public int weight() {
+            return 500;
         }
     }
 }

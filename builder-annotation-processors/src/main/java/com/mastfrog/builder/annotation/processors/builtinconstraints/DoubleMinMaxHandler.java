@@ -57,10 +57,10 @@ public class DoubleMinMaxHandler implements ConstraintHandler {
             }
         }
         if (min != null) {
-            genConsumer.accept(new MinGenerator(utils, min));
+            genConsumer.accept(new DoubleMinGenerator(utils, min));
         }
         if (max != null) {
-            genConsumer.accept(new MaxGenerator(utils, max));
+            genConsumer.accept(new DoubleMaxGenerator(utils, max));
         }
     }
 
@@ -72,19 +72,17 @@ public class DoubleMinMaxHandler implements ConstraintHandler {
         return DoubleMinMaxHandler.class.hashCode();
     }
 
-    private static class MaxGenerator implements ConstraintGenerator {
+    private static class DoubleMaxGenerator implements ConstraintGenerator {
 
         private final double max;
 
-        MaxGenerator(AnnotationUtils utils, AnnotationMirror max) {
+        DoubleMaxGenerator(AnnotationUtils utils, AnnotationMirror max) {
             this.max = utils.annotationValue(max, "value", Double.class, Double.MAX_VALUE);
         }
 
         @Override
         public <T, B extends ClassBuilder.BlockBuilderBase<T, B, X>, X> void generate(
-                String fieldVariableName, String problemsListVariableName,
-                String addMethodName, AnnotationUtils utils,
-                B bb) {
+                String fieldVariableName, String problemsListVariableName, String addMethodName, AnnotationUtils utils, B bb, String parameterName) {
             bb.lineComment(getClass().getName());
             bb.iff().value().expression(fieldVariableName).isGreaterThan(max)
                     .invoke(addMethodName)
@@ -98,34 +96,32 @@ public class DoubleMinMaxHandler implements ConstraintHandler {
 
         @Override
         public void contributeDocComments(Consumer<String> bulletPoints) {
-            bulletPoints.accept("value must be &lt;= " + max);
+            bulletPoints.accept("value must be &lt;= <code>" + max + "</code>");
         }
 
         @Override
         public String toString() {
-            return "MaxDouble(" + max + ")";
+            return getClass().getSimpleName() + "(" + max + /* " nullable " + nullable + */ ")";
         }
     }
 
-    private static class MinGenerator implements ConstraintGenerator {
+    private static class DoubleMinGenerator implements ConstraintGenerator {
 
         private final double min;
 
-        MinGenerator(AnnotationUtils utils, AnnotationMirror min) {
+        DoubleMinGenerator(AnnotationUtils utils, AnnotationMirror min) {
             this.min = utils.annotationValue(min, "value", Double.class, Double.MIN_VALUE);
         }
 
         @Override
         public <T, B extends ClassBuilder.BlockBuilderBase<T, B, X>, X>
-                void generate(String fieldVariableName, String problemsListVariableName,
-                        String addMethodName, AnnotationUtils utils,
-                        B bb) {
+                void generate(String fieldVariableName, String problemsListVariableName, String addMethodName, AnnotationUtils utils, B bb, String parameterName) {
             bb.lineComment(getClass().getName());
             bb.iff().value()
                     .expression(fieldVariableName)
                     .isLessThan(min)
                     .invoke(addMethodName)
-                    .withStringConcatentationArgument(fieldVariableName)
+                    .withStringConcatentationArgument(parameterName)
                     .append(" must be greater than or equal to ")
                     .append(min)
                     .append(" but is ").appendExpression(fieldVariableName)
@@ -136,12 +132,12 @@ public class DoubleMinMaxHandler implements ConstraintHandler {
 
         @Override
         public void contributeDocComments(Consumer<String> bulletPoints) {
-            bulletPoints.accept("value must be &gt;= " + min);
+            bulletPoints.accept("value must be &gt;= <code>" + min + "</code>");
         }
 
         @Override
         public String toString() {
-            return "MinDouble(" + min + ")";
+            return getClass().getSimpleName() + "(" + min + /* " nullable " + nullable + */ ")";
         }
     }
 }

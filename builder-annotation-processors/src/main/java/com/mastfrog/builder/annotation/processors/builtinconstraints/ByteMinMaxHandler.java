@@ -59,10 +59,10 @@ public class ByteMinMaxHandler implements ConstraintHandler {
             }
         }
         if (min != null) {
-            genConsumer.accept(new MinGenerator(utils, min, nullable));
+            genConsumer.accept(new ByteMinGenerator(utils, min, nullable));
         }
         if (max != null) {
-            genConsumer.accept(new MaxGenerator(utils, max, nullable));
+            genConsumer.accept(new ByteMaxGenerator(utils, max, nullable));
         }
     }
 
@@ -74,21 +74,19 @@ public class ByteMinMaxHandler implements ConstraintHandler {
         return ShortMinMaxHandler.class.hashCode();
     }
 
-    private static class MaxGenerator implements ConstraintGenerator {
+    private static class ByteMaxGenerator implements ConstraintGenerator {
 
         private final byte max;
         private final boolean nullable;
 
-        MaxGenerator(AnnotationUtils utils, AnnotationMirror max, boolean nullable) {
+        ByteMaxGenerator(AnnotationUtils utils, AnnotationMirror max, boolean nullable) {
             this.max = utils.annotationValue(max, "value", Byte.class, Byte.MAX_VALUE);
             this.nullable = nullable;
         }
 
         @Override
         public <T, B extends ClassBuilder.BlockBuilderBase<T, B, X>, X> void
-                generate(String fieldVariableName, String problemsListVariableName,
-                        String addMethodName, AnnotationUtils utils,
-                        B bb) {
+                generate(String fieldVariableName, String problemsListVariableName, String addMethodName, AnnotationUtils utils, B bb, String parameterName) {
             bb.lineComment(getClass().getName());
             bb.iff().value().expression(fieldVariableName).isGreaterThan(max)
                     .invoke(addMethodName)
@@ -103,34 +101,32 @@ public class ByteMinMaxHandler implements ConstraintHandler {
 
         @Override
         public void contributeDocComments(Consumer<String> bulletPoints) {
-            bulletPoints.accept("value must be &lt;= " + max);
+            bulletPoints.accept("value must be &lt;= <code>" + max + "</code>");
         }
 
         @Override
         public String toString() {
-            return "MaxByte(" + max + ")";
+            return getClass().getSimpleName() + "(" + max + /* " nullable " + nullable + */ ")";
         }
     }
 
-    private static class MinGenerator implements ConstraintGenerator {
+    private static class ByteMinGenerator implements ConstraintGenerator {
 
         private final int min;
         private final boolean nullable;
 
-        MinGenerator(AnnotationUtils utils, AnnotationMirror min, boolean nullable) {
+        ByteMinGenerator(AnnotationUtils utils, AnnotationMirror min, boolean nullable) {
             this.min = utils.annotationValue(min, "value", Byte.class, Byte.MIN_VALUE);
             this.nullable = nullable;
         }
 
         @Override
         public void contributeDocComments(Consumer<String> bulletPoints) {
-            bulletPoints.accept("value must be &gt;= " + min);
+            bulletPoints.accept("value must be &gt;= <code>" + min + "</code>");
         }
 
         @Override
-        public <T, B extends ClassBuilder.BlockBuilderBase<T, B, X>, X> void generate(String fieldVariableName, String problemsListVariableName,
-                String addMethodName, AnnotationUtils utils,
-                B bb) {
+        public <T, B extends ClassBuilder.BlockBuilderBase<T, B, X>, X> void generate(String fieldVariableName, String problemsListVariableName, String addMethodName, AnnotationUtils utils, B bb, String parameterName) {
             bb.lineComment(getClass().getName());
             ClassBuilder.ValueExpressionBuilder<ClassBuilder.ComparisonBuilder<ClassBuilder.IfBuilder<B>>> ifb = bb
                     .iff().value();
@@ -141,7 +137,7 @@ public class ByteMinMaxHandler implements ConstraintHandler {
             ifb.expression(fieldVariableName)
                     .isLessThan(min)
                     .invoke(addMethodName)
-                    .withStringConcatentationArgument(fieldVariableName)
+                    .withStringConcatentationArgument(parameterName)
                     .append(" must be greater than or equal to ")
                     .append(min)
                     .append(" but is ").appendExpression(fieldVariableName)
@@ -152,7 +148,7 @@ public class ByteMinMaxHandler implements ConstraintHandler {
 
         @Override
         public String toString() {
-            return "MinByte(" + min + ")";
+            return getClass().getSimpleName() + "(" + min + /* " nullable " + nullable + */ ")";
         }
     }
 }

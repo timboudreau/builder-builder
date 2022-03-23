@@ -26,8 +26,11 @@ package com.mastfrog.builder.annotation.processors;
 import com.mastfrog.annotation.AnnotationUtils;
 import static com.mastfrog.annotation.AnnotationUtils.capitalize;
 import static com.mastfrog.annotation.AnnotationUtils.simpleName;
-import static com.mastfrog.builder.annotation.processors.CartesianGenerator.combine;
+import static com.mastfrog.builder.annotation.processors.BuilderAnnotationProcessor.NULLABLE;
+import static com.mastfrog.builder.annotation.processors.Utils.combine;
 import com.mastfrog.builder.annotation.processors.spi.ConstraintGenerator;
+import com.mastfrog.builder.annotation.processors.spi.IsSetTestGenerator;
+import com.mastfrog.java.vogon.ArgumentConsumer;
 import com.mastfrog.java.vogon.ClassBuilder;
 import com.mastfrog.java.vogon.ClassBuilder.BlockBuilderBase;
 import com.mastfrog.java.vogon.ClassBuilder.InvocationBuilder;
@@ -38,17 +41,19 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import static java.util.Collections.sort;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import javax.annotation.processing.Filer;
+import javax.annotation.processing.FilerException;
 import javax.annotation.processing.Generated;
+import javax.lang.model.element.AnnotationMirror;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.Modifier;
@@ -80,13 +85,24 @@ final class BuilderDescriptors {
     }
 
     public void generate() throws IOException {
-        Filer filer = utils.processingEnv().getFiler();
-        for (Map.Entry<Element, BuilderDescriptor> e : descs.entrySet()) {
-            ClassBuilder cb = e.getValue().generate();
-            JavaFileObject src = filer.createSourceFile(cb.fqn(), e.getValue().elements());
-            try ( OutputStream out = src.openOutputStream()) {
-                out.write(cb.toString().getBytes(UTF_8));
+        String oldName = Thread.currentThread().getName();
+        try {
+            Filer filer = utils.processingEnv().getFiler();
+            for (Map.Entry<Element, BuilderDescriptor> e : descs.entrySet()) {
+                Thread.currentThread().setName("Generate " + e.getValue().builderName);
+                ClassBuilder cb = e.getValue().generate();
+//            ClassBuilder<String> cb = new Gen2(e.getValue(), e.getValue().styles).generate();
+                try {
+                    JavaFileObject src = filer.createSourceFile(cb.fqn(), e.getValue().elements());
+                    try ( OutputStream out = src.openOutputStream()) {
+                        out.write(cb.toString().getBytes(UTF_8));
+                    }
+                } catch (FilerException ex) {
+                    ex.printStackTrace(System.err);
+                }
             }
+        } finally {
+            Thread.currentThread().setName(oldName);
         }
     }
     static final String[] PRIMITIVE_AND_BOXED_TYPES = {
@@ -193,6 +209,10 @@ final class BuilderDescriptors {
             System.out.println("\n\n--------- END TYPE ANALYSIS --------\n");
         }
 
+        public List<FieldDescriptor> fields() {
+            return new ArrayList<>(paramForVar.values());
+        }
+
         public String targetFqn() {
             return packageName() + "." + targetTypeName;
         }
@@ -260,25 +280,25 @@ final class BuilderDescriptors {
         }
 
         public List<String> genericSignatureForBuilderWith(Collection<? extends FieldDescriptor> c, GenericSignatureKind kind) {
-            List<String> result = generics.genericNamesRequiredFor(combine(c, optionalFields()));
-            switch(kind) {
-                case EXPLICIT_BOUNDS :
+            List<String> result = generics.genericNamesRequiredFor(Utils.combine(c, optionalFields()));
+            switch (kind) {
+                case EXPLICIT_BOUNDS:
                     return fullSignatures(result);
-                default :
+                default:
                     return result;
             }
         }
 
         public String builderGenericSignature(Collection<? extends FieldDescriptor> c, GenericSignatureKind k) {
-            List<String> result = generics.genericNamesRequiredFor(combine(c, optionalFields()));
-            switch(k) {
-                case EXPLICIT_BOUNDS :
+            List<String> result = generics.genericNamesRequiredFor(Utils.combine(c, optionalFields()));
+            switch (k) {
+                case EXPLICIT_BOUNDS:
                     return composeGenericSig(fullSignatures(result));
-                case IMPLICIT_BOUNDS :
+                case IMPLICIT_BOUNDS:
                     return composeGenericSig(result);
-                case INFERRED_BOUNDS :
+                case INFERRED_BOUNDS:
                     return result.isEmpty() ? "" : "<>";
-                default :
+                default:
                     throw new AssertionError(k);
             }
         }
@@ -412,10 +432,24 @@ final class BuilderDescriptors {
         }
 
         ClassBuilder<String> generate() throws IOException {
-            if (styles.contains(BuilderStyles.FLAT)) {
-                return generateFlat();
+            boolean flat = styles.contains(BuilderStyles.FLAT);
+            int reqCount = requiredFields().size();
+            if (!flat && reqCount > 10) {
+                utils().warn(builderName + " cannot use cartesian mode - it "
+                        + "would require " + ((long) Math.pow(2, reqCount))
+                        + " nested classes, which will likely run past javac's "
+                        + "code size and line line limits", origin);
+                flat = true;
+            } else if (reqCount == 0) {
+                flat = true;
+            }
+            System.out.println("GENERATE " + builderName);
+            if (flat) {
+//                return generateFlat();
+                return new Gen2(this, styles).generate();
             } else {
-                return new CartesianGenerator.BuilderContext(origin, this).build();
+//                return new CartesianGenerator.BuilderContext(origin, this).build();
+                return new Gen2Cartesian(this).generate();
             }
         }
 
@@ -447,8 +481,7 @@ final class BuilderDescriptors {
                     .docComment("Generated builder from annotations on " + origin)
                     .withModifier(Modifier.FINAL).withModifier(Modifier.PUBLIC)
                     .autoToString()) //                    .generateDebugLogCode()
-                    .withTypeParameters(fullSignatures(generics.genericNamesRequiredFor(paramForVar.values())))
-                    ;
+                    .withTypeParameters(fullSignatures(generics.genericNamesRequiredFor(paramForVar.values())));
 
             indexPrimitives();
             generateIsSetMethod(cb);
@@ -536,7 +569,6 @@ final class BuilderDescriptors {
                     }
                 }
 
-
                 ClassBuilder.IfBuilder<?> conif = bb.iff().invoke("isEmpty").on(probName).isTrue().endCondition();
                 for (FieldDescriptor fd : paramForVar.values()) {
                     fd.generateConstraints(probName, conif);
@@ -571,15 +603,53 @@ final class BuilderDescriptors {
             String fieldName;
             private int primitiveIndex = -1;
 
+            Optional<Defaulter> defaulter;
+
             public FieldDescriptor(VariableElement var, boolean optional, String fieldName, Set<ConstraintGenerator> constraints) {
                 this.var = var;
                 this.optional = optional;
                 this.fieldName = fieldName;
                 this.constraints = constraints;
+                Defaulter def = null;
+                if (optional) {
+                    AnnotationMirror mir = utils.findAnnotationMirror(var, NULLABLE);
+                    if (mir != null) {
+                        def = Defaulter.forAnno(var, var.asType(), mir, utils);
+                    }
+                }
+                defaulter = Optional.ofNullable(def);
             }
 
+            public List<ConstraintGenerator> constraintsSorted() {
+                List<ConstraintGenerator> result = new ArrayList<>(constraints);
+                Collections.sort(result);
+                return result;
+            }
+
+            public int constraintWeightSum() {
+                int result = 0;
+                for (ConstraintGenerator cg : constraints) {
+                    result += cg.weight();
+                }
+                return result;
+            }
+
+            <V> void applyParam(String localFieldName, IsSetTestGenerator test, ArgumentConsumer<V> ib, ClassBuilder<?> cb) {
+                defaulter.ifPresentOrElse(def -> {
+                    def.generate(localFieldName, test, ib.withArgument(), cb);
+                },
+                        () -> ib.withArgument(localFieldName));
+            }
+
+//            <V> void applyParam(String localFieldName, IsSetTestGenerator test, NewBuilder<V> ib, ClassBuilder<?> cb) {
+//                defaulter.ifPresentOrElse(def -> {
+//                    def.generate(localFieldName, test, ib.withArgument(),cb
+//                    );
+//                },
+//                        () -> ib.withArgument(localFieldName));
+//            }
             public BuilderDescriptor siblingBuilder() {
-                for (Map.Entry<Element, BuilderDescriptor> e: BuilderDescriptors.this.descs.entrySet()) {
+                for (Map.Entry<Element, BuilderDescriptor> e : BuilderDescriptors.this.descs.entrySet()) {
                     if (e.getValue() == BuilderDescriptor.this) {
                         continue;
                     }
@@ -645,6 +715,8 @@ final class BuilderDescriptors {
                     switch (tp) {
                         case "char":
                             return "Character";
+                        case "int":
+                            return "Integer";
                         default:
                             return capitalize(tp);
                     }
@@ -664,8 +736,6 @@ final class BuilderDescriptors {
                             .on(problemCollectionName)
                             .endIf();
                 } else if (!optional && pi == -1) {
-                    bb.lineComment("NOt optional: " + fieldName);
-
                     bb.ifNull("this." + fieldName).invoke("add")
                             .withStringConcatentationArgument(fieldName)
                             .append(" was not set and is required")
@@ -678,9 +748,9 @@ final class BuilderDescriptors {
 
             String setterJavadoc() {
                 StringBuilder sb = new StringBuilder("Sets the ")
-                        .append(optional ? "" : "<b>required</b> ")
-                        .append("parameter ")
-                        .append(fieldName).append(" of ")
+                        .append(optional ? "<i>optional</i>" : "<b>required</b> ")
+                        .append("parameter <code>")
+                        .append(fieldName).append("</code> of ")
                         .append(" type <code>")
                         .append(AnnotationUtils.simpleName(typeName()))
                         .append("</code>.");
@@ -748,7 +818,7 @@ final class BuilderDescriptors {
                                         .ofType("IllegalArgumentException")
                                         .as("Consumer<String>");
                                 for (ConstraintGenerator c : constraints) {
-                                    c.generate(fieldName, "__failer", "accept", utils, bb);
+                                    c.generate(fieldName, "__failer", "accept", utils, bb, fieldName);
                                 }
                             }
                             if (prim && !optional && !runConstraints) {
@@ -762,7 +832,7 @@ final class BuilderDescriptors {
 
             <T, B extends ClassBuilder.BlockBuilderBase<T, B, X>, X> void generateConstraints(String problemsVar, B into) {
                 for (ConstraintGenerator gen : this.constraints) {
-                    gen.generate(fieldName, problemsVar, utils, into);
+                    gen.generate(fieldName, problemsVar, "add", utils, into, fieldName);
                 }
             }
 

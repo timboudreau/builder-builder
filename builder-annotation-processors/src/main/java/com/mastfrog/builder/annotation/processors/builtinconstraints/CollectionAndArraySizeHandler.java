@@ -28,7 +28,6 @@ import com.mastfrog.builder.annotation.processors.spi.ConstraintGenerator;
 import static com.mastfrog.builder.annotation.processors.spi.ConstraintGenerator.NULLABLE_ANNOTATION;
 import com.mastfrog.builder.annotation.processors.spi.ConstraintHandler;
 import com.mastfrog.java.vogon.ClassBuilder;
-import static java.lang.ProcessBuilder.Redirect.to;
 import java.util.function.Consumer;
 import javax.lang.model.element.AnnotationMirror;
 import javax.lang.model.element.Element;
@@ -127,23 +126,54 @@ public class CollectionAndArraySizeHandler implements ConstraintHandler {
         }
 
         @Override
-        public <T, B extends ClassBuilder.BlockBuilderBase<T, B, X>, X> void generate(String fieldVariableName, String problemsListVariableName, String addMethodName, AnnotationUtils utils, B bb) {
+        public void contributeDocComments(Consumer<String> bulletPoints) {
+            if (noNullElements && !isListOrPrimitive) {
+                bulletPoints.accept("Null elements are forbidden");
+            }
             if (nullableValue) {
-                ClassBuilder.IfBuilder<B> iff = bb.ifNotNull(addMethodName);
-                applyConstraints(fieldVariableName, problemsListVariableName, addMethodName, iff);
+                bulletPoints.accept("Parameter is optional");
+            }
+            if (min != 0) {
+                bulletPoints.accept("Must contain at least " + min + " values");
+            }
+            if (max != Integer.MAX_VALUE) {
+                bulletPoints.accept("May contain at most " + max + " values");
+            }
+            if (checkedAs != null) {
+                bulletPoints.accept("Values verified to be assignable to " + checkedAs);
+            }
+        }
+
+        @Override
+        public <T, B extends ClassBuilder.BlockBuilderBase<T, B, X>, X> void generate(String fieldVariableName, String problemsListVariableName, String addMethodName, AnnotationUtils utils, B bb, String parameterName) {
+            if (nullableValue) {
+                ClassBuilder.IfBuilder<B> iff = bb.ifNotNull(fieldVariableName);
+                applyConstraints(fieldVariableName, problemsListVariableName, addMethodName, iff, parameterName);
                 iff.endIf();
             } else {
-                applyConstraints(fieldVariableName, problemsListVariableName, addMethodName, bb);
+                applyConstraints(fieldVariableName, problemsListVariableName, addMethodName, bb, parameterName);
             }
+        }
+
+        @Override
+        public int weight() {
+            int result = 50;
+            if (noNullElements) {
+                result += 475;
+            }
+            if (checkedAs != null) {
+                result += 300;
+            }
+            return result;
         }
 
         private <T, B extends ClassBuilder.BlockBuilderBase<T, B, X>, X> void applyConstraints(
                 String fieldVariableName,
-                String problemsListVariableName, String addMethodName, B bb) {
+                String problemsListVariableName, String addMethodName, B bb, String parameterName) {
             if (min > 0) {
                 bb.iff().variable(fieldVariableName + ".length").isLessThan(min)
                         .invoke(addMethodName)
-                        .withStringConcatentationArgument(fieldVariableName)
+                        .withStringConcatentationArgument(parameterName)
                         .append(" must be >= ").append(min)
                         .append(", but is ")
                         .appendExpression(fieldVariableName + ".length")
@@ -156,7 +186,7 @@ public class CollectionAndArraySizeHandler implements ConstraintHandler {
             if (max < Integer.MAX_VALUE) {
                 bb.iff().variable(fieldVariableName + ".length").isGreaterThan(max)
                         .invoke(addMethodName)
-                        .withStringConcatentationArgument(fieldVariableName)
+                        .withStringConcatentationArgument(parameterName)
                         .append(" must be <= ").append(max)
                         .append(", but is ")
                         .appendExpression(fieldVariableName + ".length")
@@ -174,7 +204,7 @@ public class CollectionAndArraySizeHandler implements ConstraintHandler {
                     if (noNullElements) {
                         blk.ifNull(fieldVariableName + "[_i]")
                                 .invoke(addMethodName)
-                                .withStringConcatentationArgument(fieldVariableName)
+                                .withStringConcatentationArgument(parameterName)
                                 .append(" should not contain null elements, but does at index ")
                                 .appendExpression(("_i")).append(": ")
                                 .appendInvocationOf("toString").withArgument(fieldVariableName).on("java.util.Arrays")
@@ -191,7 +221,7 @@ public class CollectionAndArraySizeHandler implements ConstraintHandler {
                                 .isFalse()
                                 .endCondition()
                                 .invoke(addMethodName)
-                                .withStringConcatentationArgument(fieldVariableName)
+                                .withStringConcatentationArgument(parameterName)
                                 .append(" should contain instances of ")
                                 .append(checkedAs.toString())
                                 .append(" but element at index ").appendExpression("_i")
@@ -218,25 +248,56 @@ public class CollectionAndArraySizeHandler implements ConstraintHandler {
         }
 
         @Override
-        public <T, B extends ClassBuilder.BlockBuilderBase<T, B, X>, X> void generate(
-                String fieldVariableName, String problemsListVariableName, String addMethodName,
-                AnnotationUtils utils, B bb) {
+        public void contributeDocComments(Consumer<String> bulletPoints) {
+            if (noNullElements) {
+                bulletPoints.accept("Null elements are forbidden");
+            }
             if (nullableValue) {
-                ClassBuilder.IfBuilder<B> iff = bb.ifNotNull(addMethodName);
-                applyConstraints(fieldVariableName, problemsListVariableName, addMethodName, iff);
+                bulletPoints.accept("Parameter is optional");
+            }
+            if (min != 0) {
+                bulletPoints.accept("Must contain at least " + min + " values");
+            }
+            if (max != Integer.MAX_VALUE) {
+                bulletPoints.accept("May contain at most " + max + " values");
+            }
+            if (checkedAs != null) {
+                bulletPoints.accept("Values verified to be assignable to " + checkedAs);
+            }
+        }
+
+        @Override
+        public int weight() {
+            int result = 75;
+            if (noNullElements) {
+                result += 475;
+            }
+            if (checkedAs != null) {
+                result += 300;
+            }
+            return result;
+        }
+
+        @Override
+        public <T, B extends ClassBuilder.BlockBuilderBase<T, B, X>, X> void generate(
+                String fieldVariableName, String problemsListVariableName, String addMethodName, AnnotationUtils utils, B bb, String parameterName) {
+            if (nullableValue) {
+                ClassBuilder.IfBuilder<B> iff = bb.ifNotNull(fieldVariableName);
+                applyConstraints(fieldVariableName, problemsListVariableName, addMethodName, iff, parameterName);
                 iff.endIf();
             } else {
-                applyConstraints(fieldVariableName, problemsListVariableName, addMethodName, bb);
+                applyConstraints(fieldVariableName, problemsListVariableName, addMethodName, bb, parameterName);
             }
         }
 
         private <T, B extends ClassBuilder.BlockBuilderBase<T, B, X>, X> void applyConstraints(
                 String fieldVariableName,
-                String problemsListVariableName, String addMethodName, B bb) {
+                String problemsListVariableName, String addMethodName, B bb,
+                String parameterName) {
             if (min > 0) {
                 bb.iff().variable(fieldVariableName + ".size()").isLessThan(min)
                         .invoke(addMethodName)
-                        .withStringConcatentationArgument(fieldVariableName)
+                        .withStringConcatentationArgument(parameterName)
                         .append(" must be >= ").append(min)
                         .append(", but is ")
                         .appendExpression(fieldVariableName + ".size()")
@@ -247,7 +308,7 @@ public class CollectionAndArraySizeHandler implements ConstraintHandler {
             if (max < Integer.MAX_VALUE) {
                 bb.iff().variable(fieldVariableName + ".size()").isGreaterThan(max)
                         .invoke(addMethodName)
-                        .withStringConcatentationArgument(fieldVariableName)
+                        .withStringConcatentationArgument(parameterName)
                         .append(" must be <= ").append(max)
                         .append(", but is ")
                         .appendExpression(fieldVariableName + ".size()")
@@ -262,7 +323,7 @@ public class CollectionAndArraySizeHandler implements ConstraintHandler {
                                 .endCondition().running()
                                 .ifNull(fieldVariableName + ".get(" + "_i" + ")")
                                 .invoke(addMethodName)
-                                .withStringConcatentationArgument(fieldVariableName)
+                                .withStringConcatentationArgument(parameterName)
                                 .append(" should not contain null elements, but does at index ")
                                 .appendExpression(("_i")).append(": ")
                                 .appendExpression(fieldVariableName).endConcatenation()
@@ -275,7 +336,7 @@ public class CollectionAndArraySizeHandler implements ConstraintHandler {
                     String vn = "_" + fieldVariableName + "Item";
                     bb.simpleLoop("Object", vn, loop -> loop.over(fieldVariableName, bk -> {
                         bk.ifNull(vn).invoke(addMethodName)
-                                .withStringConcatentationArgument(fieldVariableName)
+                                .withStringConcatentationArgument(parameterName)
                                 .append(" should not contain null elements: ")
                                 .appendExpression(fieldVariableName)
                                 .endConcatenation().on(problemsListVariableName)

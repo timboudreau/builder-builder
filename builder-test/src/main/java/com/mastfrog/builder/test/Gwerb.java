@@ -26,6 +26,9 @@ package com.mastfrog.builder.test;
 import com.mastfrog.builder.annotations.GenerateBuilder;
 import com.mastfrog.builder.annotations.Nullable;
 import com.mastfrog.builder.annotations.constraint.CollectionConstraint;
+import com.mastfrog.builder.annotations.constraint.IntMax;
+import com.mastfrog.builder.annotations.constraint.IntMin;
+import java.util.Arrays;
 import java.util.Map;
 import java.util.Set;
 
@@ -43,14 +46,21 @@ public class Gwerb<T> {
     @GenerateBuilder
     public Gwerb(
             @CollectionConstraint(minSize = 1, maxSize = 10, forbidNullValues = true) Set<String> strings,
-            @Nullable @CollectionConstraint(minSize = 2, maxSize = 12) int[] ints,
+            @IntMax(52) @IntMin(12) @Nullable @CollectionConstraint(minSize = 2, maxSize = 12) int[] ints,
             @CollectionConstraint(minSize = 3, maxSize = 34, forbidNullValues = true,
-                    checked=CharSequence.class) T[] objs,
+                    checked = CharSequence.class) T[] objs,
             @CollectionConstraint(minSize = 7, maxSize = 17) Map<String, Object> stuff) {
         this.strings = strings;
         this.ints = ints;
         this.objs = objs;
         this.stuff = stuff;
+    }
+
+    @Override
+    public String toString() {
+        return "Gwerb{" + "strings=" + strings + ", ints="
+                + Arrays.toString(ints) + ", objs=" + Arrays.toString(objs)
+                + ", stuff=" + stuff + '}';
     }
 
 }

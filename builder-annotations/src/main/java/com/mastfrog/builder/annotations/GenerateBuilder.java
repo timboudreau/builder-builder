@@ -1,7 +1,7 @@
 /*
  * The MIT License
  *
- * Copyright 2020 Mastfrog Technologies.
+ * Copyright 2022 Mastfrog Technologies.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -30,6 +30,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import java.lang.annotation.Target;
 
 /**
+ * Indicate that a builder should be generated for a given method or class.
  *
  * @author Tim Boudreau
  */
@@ -38,16 +39,17 @@ import java.lang.annotation.Target;
 public @interface GenerateBuilder {
 
     /**
-     * The name of the generated builder.
+     * The name of the generated builder; if unset, it will be the class name of
+     * the target type with <i>Builder</i> appended to it.
      *
      * @return A class name
      */
     String className() default "";
 
     /**
-     * The set of style flags that affect code generationl.
+     * The set of style flags that affect code generation.
      *
-     * @return
+     * @return A set of styles
      */
     BuilderStyles[] styles() default {BuilderStyles.CLOSURES};
 

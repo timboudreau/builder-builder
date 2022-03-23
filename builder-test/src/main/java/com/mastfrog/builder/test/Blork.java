@@ -25,16 +25,16 @@ package com.mastfrog.builder.test;
 
 import com.mastfrog.builder.annotations.BuilderStyles;
 import com.mastfrog.builder.annotations.GenerateBuilder;
-import com.mastfrog.builder.annotations.Nullable;
 import com.mastfrog.builder.annotations.constraint.CollectionConstraint;
+import com.mastfrog.builder.annotations.constraint.IntMax;
+import com.mastfrog.builder.annotations.constraint.IntMin;
 import com.mastfrog.builder.annotations.constraint.LongMax;
 import com.mastfrog.builder.annotations.constraint.LongMin;
 import com.mastfrog.builder.annotations.constraint.StringPattern;
 import java.io.IOException;
 import java.time.temporal.TemporalAccessor;
+import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
-import java.util.function.Consumer;
 
 /**
  *
@@ -47,26 +47,31 @@ public class Blork<T, R extends TemporalAccessor, M extends Appendable & CharSeq
     private final String name;
     private final T theTee;
     private final Class<? extends T> tType;
+    private final int[] intArray;
 
-    @GenerateBuilder(styles = BuilderStyles.FLAT)
+    @GenerateBuilder(styles = {})
     Blork(Class<? extends T> tType, T theTee,
             @StringPattern(maxLength = 24, minLength = 24, value = "^[\\d_]+$") String name, 
             R theR,
             @LongMax(53) @LongMin(1) long count,
             ComplexThing complex,
-            @CollectionConstraint(minSize=3, maxSize=16, forbidNullValues = true) List<M> emmm)
+            @CollectionConstraint(minSize=3, maxSize=16, forbidNullValues = true) List<M> emmm,
+            @IntMin(5) @IntMax(123) int[] intArray)
             throws IOException, ClassNotFoundException {
         this.tType = tType;
         this.theTee = theTee;
         this.name = name;
         this.theR = theR;
         this.count = count;
+        this.intArray = intArray;
     }
 
     @Override
     public String toString() {
         return "Blork{" + "count=" + count + ", theR=" + theR + ", name="
-                + name + ", theTee=" + theTee + ", tType=" + tType + '}';
+                + name + ", theTee=" + theTee + ", tType=" + tType 
+                + ", intArray=" + Arrays.toString(intArray)
+                + '}';
     }
 
 }

@@ -21,43 +21,20 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-package com.mastfrog.builder.annotations.constraint;
+package com.mastfrog.builder.annotation.processors.spi;
 
-import static java.lang.annotation.ElementType.PARAMETER;
-import java.lang.annotation.Retention;
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
-import java.lang.annotation.Target;
+import com.mastfrog.java.vogon.ClassBuilder;
+import com.mastfrog.java.vogon.ClassBuilder.BlockBuilderBase;
+import com.mastfrog.java.vogon.ClassBuilder.ConditionBuilder;
+import com.mastfrog.java.vogon.ClassBuilder.ValueExpressionBuilder;
 
 /**
- * Regular expression and length constraint for strings.
  *
  * @author Tim Boudreau
  */
-@Retention(RUNTIME)
-@Target(PARAMETER)
-@AppliesTo({CharSequence.class})
-public @interface StringPattern {
+public interface IsSetTestGenerator {
 
-    /**
-     * An optional regular expression (must be parsable by java.util.Pattern).
-     *
-     * @return A valid regular expression
-     */
-    String value() default ".*";
+    public <X> ValueExpressionBuilder<ValueExpressionBuilder<X>> isSetTest(
+                    ConditionBuilder<ValueExpressionBuilder<ValueExpressionBuilder<X>>> tern);
 
-    /**
-     * The minimum length a string should have
-     *
-     * @return A minimum length, non-negative and less than or equal to
-     * maxLength() if specified.
-     */
-    int minLength() default 0;
-
-    /**
-     * The maximum length a string should have
-     *
-     * @return The maximum length - non negative and must be greater than or
-     * equal to minLiength() if specified.
-     */
-    int maxLength() default Integer.MAX_VALUE;
 }

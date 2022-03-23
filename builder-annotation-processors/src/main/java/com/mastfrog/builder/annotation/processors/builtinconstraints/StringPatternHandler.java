@@ -91,6 +91,21 @@ public class StringPatternHandler implements ConstraintHandler {
             this.nullable = nullable;
         }
 
+        @Override
+        public int weight() {
+            int result = 0;
+            if (pattern != null) {
+                result += 250;
+            }
+            if (minLength != 0) {
+                result += 50;
+            }
+            if (maxLength != Integer.MAX_VALUE) {
+                result += 50;
+            }
+            return result;
+        }
+
         private String patternVarName() {
             return "_" + varName + "Pattern";
         }
@@ -99,13 +114,15 @@ public class StringPatternHandler implements ConstraintHandler {
         public <C> void decorateClass(ClassBuilder<C> bldr) {
             if (pattern != null) {
                 bldr.importing(Pattern.class);
-                bldr.field(patternVarName(), fb -> {
-                    fb.withModifier(Modifier.PRIVATE, Modifier.STATIC, Modifier.FINAL)
-                            .initializedFromInvocationOf("compile")
-                            .withStringLiteral(doubleBackslashes(pattern.pattern()))
-                            .on("Pattern")
-                            .ofType(Pattern.class.getSimpleName());
-                });
+                if (!bldr.topLevel().containsFieldNamed(patternVarName())) {
+                    bldr.topLevel().field(patternVarName(), fb -> {
+                        fb.withModifier(Modifier.PRIVATE, Modifier.STATIC, Modifier.FINAL)
+                                .initializedFromInvocationOf("compile")
+                                .withStringLiteral(doubleBackslashes(pattern.pattern()))
+                                .on("Pattern")
+                                .ofType(Pattern.class.getSimpleName());
+                    });
+                }
             }
         }
 
@@ -127,7 +144,7 @@ public class StringPatternHandler implements ConstraintHandler {
         @Override
         public void contributeDocComments(Consumer<String> bulletPoints) {
             if (pattern != null) {
-                bulletPoints.accept("Must match the pattern /" + doubleBackslashes(pattern.pattern()) + "/.");
+                bulletPoints.accept("Must match the pattern <code>/" + doubleBackslashes(pattern.pattern()) + "/</code>");
             }
             if (minLength != 0) {
                 bulletPoints.accept("Must be &gt;= " + minLength + " in length.");
@@ -151,15 +168,14 @@ public class StringPatternHandler implements ConstraintHandler {
 
         @Override
         public <T, B extends ClassBuilder.BlockBuilderBase<T, B, X>, X> void generate(
-                String fieldVariableName, String problemsListVariableName,
-                String addMethodName, AnnotationUtils utils, B bb) {
+                String fieldVariableName, String problemsListVariableName, String addMethodName, AnnotationUtils utils, B bb, String parameterName) {
             bb.lineComment(getClass().getName());
             if (minLength != 0) {
                 applyNullCheck(fieldVariableName, bb.iff())
                         .invoke("length").on(fieldVariableName)
                         .isLessThan(minLength)
                         .invoke(addMethodName)
-                        .withStringConcatentationArgument(fieldVariableName)
+                        .withStringConcatentationArgument(parameterName)
                         .append(" must be at least ")
                         .append(minLength)
                         .append(" characters, but is ")
@@ -172,7 +188,7 @@ public class StringPatternHandler implements ConstraintHandler {
                         .invoke("length").on(fieldVariableName)
                         .isGreaterThan(maxLength)
                         .invoke(addMethodName)
-                        .withStringConcatentationArgument(fieldVariableName)
+                        .withStringConcatentationArgument(parameterName)
                         .append(" must no longer than ")
                         .append(maxLength)
                         .append(" characters, but is ")
@@ -190,7 +206,7 @@ public class StringPatternHandler implements ConstraintHandler {
                         //                        .endCondition()
                         .invoke(addMethodName)
                         .withStringConcatentationArgument("Value of ")
-                        .append(fieldVariableName)
+                        .append(parameterName)
                         .append(" '")
                         .appendExpression(fieldVariableName)
                         .append("' does not match the pattern /")

@@ -1,0 +1,10 @@
+Nullable should have new name, and have parameter
+allowNullsToBePassedToBuilder
+
+(and that should perhaps determine if the builder 
+field uses a boxed or unboxed type)
+
+Booleans 
+  - default to false?
+  - include in fields mask if not optional?
+  
