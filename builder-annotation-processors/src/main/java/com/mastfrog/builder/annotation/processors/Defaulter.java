@@ -48,11 +48,13 @@ public abstract class Defaulter {
         return false;
     }
 
-    public <X> X generate(String localName, IsSetTestGenerator test, ValueExpressionBuilder<X> veb, ClassBuilder<?> target) {
+    public <X> X generate(String localName, IsSetTestGenerator test,
+            ValueExpressionBuilder<X> veb, ClassBuilder<?> target) {
         return test.isSetTest(veb.ternary()).expression(localName).expression(defaultExpression());
     }
 
-    public static Defaulter forAnno(Element el, TypeMirror type, AnnotationMirror nullableAnno, AnnotationUtils utils) {
+    public static Defaulter forAnno(Element el, TypeMirror type, AnnotationMirror nullableAnno,
+            AnnotationUtils utils) {
         String stringDefault = utils.annotationValue(nullableAnno, "stringDefault", String.class);
         Double numericDefault = utils.annotationValue(nullableAnno, "numericDefault", Double.class);
         Boolean boolDefault = utils.annotationValue(nullableAnno, "booleanDefault", Boolean.class);
@@ -60,7 +62,8 @@ public abstract class Defaulter {
 
         int ct = countNonNulls(stringDefault, numericDefault, boolDefault, useEmptyDefault);
         if (ct > 1) {
-            utils.fail("Only one of stringDefault, numericDefault, booleanDefault or defaulted may be specified per parameter", el, nullableAnno);
+            utils.fail("Only one of stringDefault, numericDefault, booleanDefault or "
+                    + "defaulted may be specified per parameter", el, nullableAnno);
             return new NoOp();
         } else if (ct == 0) {
             return new NoOp();
@@ -70,8 +73,14 @@ public abstract class Defaulter {
         if (nonNullAndTrue(useEmptyDefault)) {
             return emptyDefault(el, type, nullableAnno, utils, rawType);
         } else if (nonNullAndTrue(boolDefault)) {
+            if (rawType.getKind() != TypeKind.BOOLEAN && !"java.lang.Boolean".equals(rawType.toString())) {
+                utils.fail("Cannot use a boolean default for " + rawType);
+            }
             return new Fixed("true");
         } else if (boolDefault != null) {
+            if (rawType.getKind() != TypeKind.BOOLEAN && !"java.lang.Boolean".equals(rawType.toString())) {
+                utils.fail("Cannot use a boolean default for " + rawType);
+            }
             return new Fixed("false");
         } else if (numericDefault != null) {
             switch (rawType.getKind()) {
@@ -84,15 +93,19 @@ public abstract class Defaulter {
                 case CHAR:
                     return new NumberGen(numericDefault, rawType.getKind());
                 default:
-                    utils.fail("Cannot use a numeric default " + numericDefault + " for a variable of type " + type);
+                    utils.fail("Cannot use a numeric default " + numericDefault
+                            + " for a variable of type " + type);
                     break;
             }
         } else if (stringDefault != null) {
-            if (java.lang.CharSequence.class.getName().equals(rawType.toString()) || utils.isAssignable(rawType, "java.lang.String")) {
+            if (java.lang.CharSequence.class.getName().equals(rawType.toString())
+                    || utils.isAssignable(rawType, "java.lang.String")) {
                 return new StringLiteral(stringDefault);
-            } else if ("char".equals(rawType.toString()) || "java.lang.Character".equals(rawType.toString())) {
+            } else if ("char".equals(rawType.toString())
+                    || "java.lang.Character".equals(rawType.toString())) {
                 if (stringDefault.length() != 1) {
-                    utils.fail("Character default for " + el.getSimpleName() + " must be exactly 1 character in length", el, nullableAnno);
+                    utils.fail("Character default for " + el.getSimpleName()
+                            + " must be exactly 1 character in length", el, nullableAnno);
                 } else {
                     return new CharLiteral(stringDefault.charAt(0));
                 }
@@ -104,6 +117,7 @@ public abstract class Defaulter {
     }
 
     static class NumberGen extends Defaulter {
+
         private final Number numericDefault;
         private final TypeKind kind;
 
@@ -114,7 +128,7 @@ public abstract class Defaulter {
 
         @Override
         String defaultExpression() {
-            switch(kind) {
+            switch (kind) {
                 case DOUBLE:
                     if (numericDefault.doubleValue() == Double.MAX_VALUE) {
                         return "Double.MAX_VALUE";
@@ -173,7 +187,8 @@ public abstract class Defaulter {
         }
     }
 
-    private static Defaulter emptyDefault(Element el, TypeMirror type, AnnotationMirror nullableAnno, AnnotationUtils utils, TypeMirror rawType) {
+    private static Defaulter emptyDefault(Element el, TypeMirror type,
+            AnnotationMirror nullableAnno, AnnotationUtils utils, TypeMirror rawType) {
         boolean arr = rawType.getKind() == TypeKind.ARRAY;
         if (!arr) {
             switch (type.getKind()) {
@@ -276,7 +291,8 @@ public abstract class Defaulter {
                 case TYPEVAR:
                     return new GenericArray();
                 default:
-                    utils.fail("Cannot create a default array value for component of kind " + comp.getKind(), el, nullableAnno);
+                    utils.fail("Cannot create a default array value for component of kind "
+                            + comp.getKind(), el, nullableAnno);
             }
         }
         utils.fail("No idea how to make an empty default value for " + type, el, nullableAnno);
@@ -305,7 +321,8 @@ public abstract class Defaulter {
         }
 
         @Override
-        public <X> X generate(String localName, IsSetTestGenerator test, ValueExpressionBuilder<X> veb, ClassBuilder<?> target) {
+        public <X> X generate(String localName, IsSetTestGenerator test, ValueExpressionBuilder<X> veb,
+                ClassBuilder<?> target) {
             return veb.expression(localName);
         }
 
@@ -322,11 +339,12 @@ public abstract class Defaulter {
         }
 
         @Override
-        public <X> X generate(String localName, IsSetTestGenerator test, ValueExpressionBuilder<X> veb, ClassBuilder<?> target) {
+        public <X> X generate(String localName, IsSetTestGenerator test, ValueExpressionBuilder<X> veb,
+                ClassBuilder<?> target) {
             String mn = "__emptyGenericArray__";
             ClassBuilder<?> top = target.topLevel();
             if (!top.containsMethodNamed(mn)) {
-                target.method(mn, mb -> {
+                top.method(mn, mb -> {
                     mb.withModifier(Modifier.PRIVATE, Modifier.STATIC)
                             .returning("T[]")
                             .docComment("Works around the prohibition on explicitly creating new "
@@ -371,7 +389,8 @@ public abstract class Defaulter {
         }
 
         @Override
-        public <X> X generate(String localName, IsSetTestGenerator test, ValueExpressionBuilder<X> veb, ClassBuilder<?> target) {
+        public <X> X generate(String localName, IsSetTestGenerator test, ValueExpressionBuilder<X> veb,
+                ClassBuilder<?> target) {
             return test.isSetTest(veb.ternary()).expression(localName).literal("");
         }
     }
@@ -390,7 +409,8 @@ public abstract class Defaulter {
         }
 
         @Override
-        public <X> X generate(String localName, IsSetTestGenerator test, ValueExpressionBuilder<X> veb, ClassBuilder<?> target) {
+        public <X> X generate(String localName, IsSetTestGenerator test, ValueExpressionBuilder<X> veb,
+                ClassBuilder<?> target) {
             return test.isSetTest(veb.ternary()).expression(localName).literal(string);
         }
     }
@@ -409,7 +429,8 @@ public abstract class Defaulter {
         }
 
         @Override
-        public <X> X generate(String localName, IsSetTestGenerator test, ValueExpressionBuilder<X> veb, ClassBuilder<?> target) {
+        public <X> X generate(String localName, IsSetTestGenerator test, ValueExpressionBuilder<X> veb,
+                ClassBuilder<?> target) {
             return test.isSetTest(veb.ternary()).expression(localName).literal(ch);
         }
     }

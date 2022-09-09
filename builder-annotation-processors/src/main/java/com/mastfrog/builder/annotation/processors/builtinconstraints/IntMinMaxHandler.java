@@ -54,7 +54,8 @@ public class IntMinMaxHandler implements ConstraintHandler {
         if (min != null || max != null) {
             TypeMirror paramType = parameterElement.asType();
             if ("int[]".equals(paramType.toString())) {
-                genConsumer.accept(new IntArrayMinMaxGenerator(utils, min, max, nullable));
+                genConsumer.accept(new IntArrayMinMaxGenerator(parameterElement,
+                        utils, min, max, nullable));
                 return;
             }
             if (!utils.isAssignable(paramType, Integer.class.getName()) && !utils.isAssignable(paramType, int.class.getName())) {
@@ -180,9 +181,12 @@ public class IntMinMaxHandler implements ConstraintHandler {
         private final int max;
         private final boolean nullable;
 
-        IntArrayMinMaxGenerator(AnnotationUtils utils, AnnotationMirror min, AnnotationMirror max, boolean nullable) {
+        IntArrayMinMaxGenerator(Element el, AnnotationUtils utils, AnnotationMirror min, AnnotationMirror max, boolean nullable) {
             this.min = min == null ? Integer.MIN_VALUE : utils.annotationValue(min, "value", Integer.class, Integer.MIN_VALUE);
             this.max = max == null ? Integer.MAX_VALUE : utils.annotationValue(max, "value", Integer.class, Integer.MAX_VALUE);
+            if (this.min > this.max) {
+                utils.fail("Minimum element value " + this.min + " is greater than maximum " + this.max, el);
+            }
             this.nullable = nullable;
         }
 
@@ -252,8 +256,8 @@ public class IntMinMaxHandler implements ConstraintHandler {
             if (nullable) {
                 bulletPoints.accept("Parameter is optional.");
             }
-            bulletPoints.accept("All values must be >= " + min);
-            bulletPoints.accept("All values must be <= " + max);
+            bulletPoints.accept("All values must be &gt;= <code>" + min + "</code>");
+            bulletPoints.accept("All values must be &lt;= <code>" + max+ "</code>");
         }
 
         @Override

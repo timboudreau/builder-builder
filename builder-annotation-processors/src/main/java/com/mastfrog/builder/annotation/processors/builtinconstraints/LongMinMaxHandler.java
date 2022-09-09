@@ -25,6 +25,7 @@ package com.mastfrog.builder.annotation.processors.builtinconstraints;
 
 import com.mastfrog.annotation.AnnotationUtils;
 import com.mastfrog.builder.annotation.processors.spi.ConstraintGenerator;
+import static com.mastfrog.builder.annotation.processors.spi.ConstraintGenerator.NULLABLE_ANNOTATION;
 import com.mastfrog.builder.annotation.processors.spi.ConstraintHandler;
 import com.mastfrog.java.vogon.ClassBuilder;
 import com.mastfrog.util.service.ServiceProvider;
@@ -41,14 +42,15 @@ import javax.lang.model.type.TypeMirror;
 @ServiceProvider(ConstraintHandler.class)
 public class LongMinMaxHandler implements ConstraintHandler {
 
-    private static final String INT_MIN = "com.mastfrog.builder.annotations.constraint.LongMin";
-    private static final String INT_MAX = "com.mastfrog.builder.annotations.constraint.LongMax";
+    private static final String LONG_MIN = "com.mastfrog.builder.annotations.constraint.LongMin";
+    private static final String LONG_MAX = "com.mastfrog.builder.annotations.constraint.LongMax";
 
     @Override
     public void collect(AnnotationUtils utils, Element targetElement, VariableElement parameterElement,
             Consumer<ConstraintGenerator> genConsumer) {
-        AnnotationMirror min = utils.findAnnotationMirror(parameterElement, INT_MIN);
-        AnnotationMirror max = utils.findAnnotationMirror(parameterElement, INT_MAX);
+        AnnotationMirror min = utils.findAnnotationMirror(parameterElement, LONG_MIN);
+        AnnotationMirror max = utils.findAnnotationMirror(parameterElement, LONG_MAX);
+        boolean nullable = utils.findAnnotationMirror(parameterElement, NULLABLE_ANNOTATION) != null;
         if (min != null || max != null) {
             TypeMirror paramType = parameterElement.asType();
             if (!utils.isAssignable(paramType, Long.class.getName()) && !utils.isAssignable(paramType, long.class.getName())) {
@@ -57,10 +59,10 @@ public class LongMinMaxHandler implements ConstraintHandler {
             }
         }
         if (min != null) {
-            genConsumer.accept(new LongMinGenerator(utils, min));
+            genConsumer.accept(new LongMinGenerator(utils, min, nullable));
         }
         if (max != null) {
-            genConsumer.accept(new LongMaxGenerator(utils, max));
+            genConsumer.accept(new LongMaxGenerator(utils, max, nullable));
         }
     }
 
@@ -75,13 +77,27 @@ public class LongMinMaxHandler implements ConstraintHandler {
     private static class LongMaxGenerator implements ConstraintGenerator {
 
         private final long max;
+        private final boolean nullable;
 
-        LongMaxGenerator(AnnotationUtils utils, AnnotationMirror max) {
+        LongMaxGenerator(AnnotationUtils utils, AnnotationMirror max, boolean nullable) {
             this.max = utils.annotationValue(max, "value", Long.class, Long.MAX_VALUE);
+            this.nullable = nullable;
         }
 
         @Override
         public <T, B extends ClassBuilder.BlockBuilderBase<T, B, X>, X> void generate(
+                String fieldVariableName, String problemsListVariableName, String addMethodName,
+                AnnotationUtils utils, B bb, String parameterName) {
+            if (nullable) {
+                ClassBuilder.IfBuilder<B> iff = bb.ifNotNull(fieldVariableName);
+                apply(fieldVariableName, problemsListVariableName, addMethodName, utils, iff, parameterName);
+                iff.endIf();
+            } else {
+                apply(fieldVariableName, problemsListVariableName, addMethodName, utils, bb, parameterName);
+            }
+        }
+
+        private <T, B extends ClassBuilder.BlockBuilderBase<T, B, X>, X> void apply(
                 String fieldVariableName, String problemsListVariableName, String addMethodName, AnnotationUtils utils, B bb, String parameterName) {
             bb.lineComment(getClass().getName());
             bb.iff().value().expression(fieldVariableName).isGreaterThan(max)
@@ -100,20 +116,34 @@ public class LongMinMaxHandler implements ConstraintHandler {
 
         @Override
         public String toString() {
-            return getClass().getSimpleName() + "(" + max + /* " nullable " + nullable + */ ")";
+            return getClass().getSimpleName() + "(" + max + " nullable " + nullable + ")";
         }
     }
 
     private static class LongMinGenerator implements ConstraintGenerator {
 
         private final long min;
+        private final boolean nullable;
 
-        LongMinGenerator(AnnotationUtils utils, AnnotationMirror min) {
+        LongMinGenerator(AnnotationUtils utils, AnnotationMirror min, boolean nullable) {
             this.min = utils.annotationValue(min, "value", Long.class, Long.MIN_VALUE);
+            this.nullable = nullable;
         }
 
         @Override
-        public <T, B extends ClassBuilder.BlockBuilderBase<T, B, X>, X>  void generate(
+        public <T, B extends ClassBuilder.BlockBuilderBase<T, B, X>, X> void generate(
+                String fieldVariableName, String problemsListVariableName, String addMethodName,
+                AnnotationUtils utils, B bb, String parameterName) {
+            if (nullable) {
+                ClassBuilder.IfBuilder<B> iff = bb.ifNotNull(fieldVariableName);
+                apply(fieldVariableName, problemsListVariableName, addMethodName, utils, iff, parameterName);
+                iff.endIf();
+            } else {
+                apply(fieldVariableName, problemsListVariableName, addMethodName, utils, bb, parameterName);
+            }
+        }
+
+        private <T, B extends ClassBuilder.BlockBuilderBase<T, B, X>, X> void apply(
                 String fieldVariableName, String problemsListVariableName, String addMethodName, AnnotationUtils utils, B bb, String parameterName) {
             bb.lineComment(getClass().getName());
             bb.iff().value()
@@ -136,7 +166,7 @@ public class LongMinMaxHandler implements ConstraintHandler {
 
         @Override
         public String toString() {
-            return getClass().getSimpleName() + "(" + min + /* " nullable " + nullable + */ ")";
+            return getClass().getSimpleName() + "(" + min + " nullable " + nullable + ")";
         }
     }
 }

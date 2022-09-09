@@ -41,14 +41,14 @@ import javax.lang.model.type.TypeMirror;
 @ServiceProvider(ConstraintHandler.class)
 public class ShortMinMaxHandler implements ConstraintHandler {
 
-    private static final String INT_MIN = "com.mastfrog.builder.annotations.constraint.ShortMin";
-    private static final String INT_MAX = "com.mastfrog.builder.annotations.constraint.ShortMax";
+    private static final String SHORT_MIN = "com.mastfrog.builder.annotations.constraint.ShortMin";
+    private static final String SHORT_MAX = "com.mastfrog.builder.annotations.constraint.ShortMax";
 
     @Override
     public void collect(AnnotationUtils utils, Element targetElement, VariableElement parameterElement,
             Consumer<ConstraintGenerator> genConsumer) {
-        AnnotationMirror min = utils.findAnnotationMirror(parameterElement, INT_MIN);
-        AnnotationMirror max = utils.findAnnotationMirror(parameterElement, INT_MAX);
+        AnnotationMirror min = utils.findAnnotationMirror(parameterElement, SHORT_MIN);
+        AnnotationMirror max = utils.findAnnotationMirror(parameterElement, SHORT_MAX);
         if (min != null || max != null) {
             TypeMirror paramType = parameterElement.asType();
             if (!utils.isAssignable(paramType, Short.class.getName()) && !utils.isAssignable(paramType, short.class.getName())) {

@@ -25,6 +25,10 @@ package com.mastfrog.builder.test;
 
 import com.mastfrog.builder.annotations.BuilderStyles;
 import com.mastfrog.builder.annotations.GenerateBuilder;
+import com.mastfrog.builder.annotations.Optionally;
+import com.mastfrog.builder.annotations.constraint.IntMax;
+import com.mastfrog.builder.annotations.constraint.LongMax;
+import com.mastfrog.builder.annotations.constraint.LongMin;
 
 /**
  *
@@ -43,8 +47,16 @@ public class NineFields {
     private final byte f8;
 
     @GenerateBuilder(styles = BuilderStyles.FLAT)
-    public NineFields(byte f0, short f1, int f2, long f3, char f4,
-            boolean f5, double f6, float f7, byte f8) {
+    public NineFields(
+            byte f0,
+            @Optionally(defaulted = true) short f1,
+            @IntMax(20000) int f2,
+            @LongMin(52) @LongMax(10000) long f3,
+            char f4,
+            boolean f5,
+            double f6,
+            float f7,
+            byte f8) {
         this.f0 = f0;
         this.f1 = f1;
         this.f2 = f2;

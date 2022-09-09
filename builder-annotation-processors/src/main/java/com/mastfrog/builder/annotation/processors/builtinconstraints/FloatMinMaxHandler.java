@@ -41,18 +41,20 @@ import javax.lang.model.type.TypeMirror;
 @ServiceProvider(ConstraintHandler.class)
 public class FloatMinMaxHandler implements ConstraintHandler {
 
-    private static final String INT_MIN = "com.mastfrog.builder.annotations.constraint.FloatMin";
-    private static final String INT_MAX = "com.mastfrog.builder.annotations.constraint.FloatMax";
+    private static final String FLOAT_MIN = "com.mastfrog.builder.annotations.constraint.FloatMin";
+    private static final String FLOAT_MAX = "com.mastfrog.builder.annotations.constraint.FloatMax";
 
     @Override
     public void collect(AnnotationUtils utils, Element targetElement, VariableElement parameterElement,
             Consumer<ConstraintGenerator> genConsumer) {
-        AnnotationMirror min = utils.findAnnotationMirror(parameterElement, INT_MIN);
-        AnnotationMirror max = utils.findAnnotationMirror(parameterElement, INT_MAX);
+        AnnotationMirror min = utils.findAnnotationMirror(parameterElement, FLOAT_MIN);
+        AnnotationMirror max = utils.findAnnotationMirror(parameterElement, FLOAT_MAX);
         if (min != null || max != null) {
             TypeMirror paramType = parameterElement.asType();
-            if (!utils.isAssignable(paramType, Float.class.getName()) && !utils.isAssignable(paramType, float.class.getName())) {
-                utils.fail("Cannot apply FloatMin or FloatMax to a " + paramType, parameterElement, (min == null ? min : max));
+            if (!utils.isAssignable(paramType, Float.class.getName())
+                    && !utils.isAssignable(paramType, float.class.getName())) {
+                utils.fail("Cannot apply FloatMin or FloatMax to a " + paramType,
+                        parameterElement, (min == null ? min : max));
                 return;
             }
         }

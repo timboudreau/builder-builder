@@ -26,7 +26,6 @@ package com.mastfrog.builder.test;
 import com.mastfrog.builder.annotations.BuilderStyles;
 import java.util.Set;
 import com.mastfrog.builder.annotations.GenerateBuilder;
-import com.mastfrog.builder.annotations.Nullable;
 import com.mastfrog.builder.annotations.constraint.CollectionConstraint;
 import com.mastfrog.builder.annotations.constraint.DoubleMax;
 import com.mastfrog.builder.annotations.constraint.DoubleMin;
@@ -38,6 +37,7 @@ import com.mastfrog.builder.annotations.constraint.LongMax;
 import com.mastfrog.builder.annotations.constraint.StringPattern;
 import java.io.IOException;
 import java.rmi.UnknownHostException;
+import com.mastfrog.builder.annotations.Optionally;
 
 /**
  *
@@ -54,11 +54,11 @@ public class ComplexThing {
 
     @GenerateBuilder()
     ComplexThing(@IntMin(23) @IntMax(52) int id,
-            @Nullable @StringPattern(value = "^[A-Z][a-zA-Z0-9]+$", minLength = 3, maxLength = 24) String name,
+            @Optionally @StringPattern(value = "^[A-Z][a-zA-Z0-9]+$", minLength = 3, maxLength = 24) String name,
             @LongMax(51424280634L) long when,
             @FloatMin(1.5F) @FloatMax(2.5F) float weight,
             @CollectionConstraint(minSize = 3, maxSize = 16, forbidNullValues = true) Set<String> contents,
-            @Nullable OtherThing other,
+            @Optionally OtherThing other,
             boolean isPretty) throws IOException, ClassNotFoundException, UnknownHostException {
         this.id = id;
         this.name = name;

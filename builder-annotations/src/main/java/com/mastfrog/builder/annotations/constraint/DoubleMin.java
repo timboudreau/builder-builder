@@ -29,6 +29,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import java.lang.annotation.Target;
 
 /**
+ * <i>Inclusive</i> minimum double value.
  *
  * @author Tim Boudreau
  */

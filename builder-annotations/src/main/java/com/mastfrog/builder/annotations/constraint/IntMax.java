@@ -29,12 +29,13 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import java.lang.annotation.Target;
 
 /**
+ * <i>Inclusive</i> maximum int value.
  *
  * @author Tim Boudreau
  */
 @Retention(RUNTIME)
 @Target(PARAMETER)
-@AppliesTo({Integer.class, int.class})
+@AppliesTo({Integer.class, int.class, int[].class})
 public @interface IntMax {
 
     int value();

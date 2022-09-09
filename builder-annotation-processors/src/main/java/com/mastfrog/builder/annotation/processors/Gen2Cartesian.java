@@ -42,9 +42,12 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import javax.lang.model.element.Modifier;
+import static javax.lang.model.element.Modifier.FINAL;
 import static javax.lang.model.element.Modifier.PRIVATE;
+import static javax.lang.model.element.Modifier.PUBLIC;
 import static javax.lang.model.element.Modifier.STATIC;
 import javax.lang.model.type.TypeKind;
 
@@ -64,7 +67,8 @@ public class Gen2Cartesian {
     ClassBuilder<String> generate() {
         ClassBuilder<String> cb = ClassBuilder.forPackage(desc.packageName())
                 .named(desc.builderName)
-                .withModifier(Modifier.PUBLIC, Modifier.FINAL);
+                .withModifier(PUBLIC, FINAL)
+                .autoToString();
         initTree();
         List<OneBuilderModel> models = new ArrayList<>(this.models.values());
         Collections.sort(models, (a, b) -> {
@@ -80,9 +84,7 @@ public class Gen2Cartesian {
             }
             return 0;
         });
-        System.out.println("WILL GENERATE " + models.size() + " builders");
         for (OneBuilderModel m : models) {
-            System.out.println(m);
             m.generateSkeleton(cb);
         }
         return cb;
@@ -161,10 +163,11 @@ public class Gen2Cartesian {
 
         <C> ClassBuilder<?> generateSkeleton(ClassBuilder<C> cb) {
             ClassBuilder<?> result = isRoot() ? cb : cb.innerClass(name)
-                    .withModifier(Modifier.PUBLIC, Modifier.FINAL);
+                    .withModifier(PUBLIC, FINAL)
+                    .autoToString();
             if (result.topLevel() != result) {
                 try {
-                    result.withModifier(Modifier.STATIC);
+                    result.withModifier(STATIC);
                 } catch (IllegalStateException ex) {
                     ex.printStackTrace(System.err);
                 }
@@ -189,7 +192,7 @@ public class Gen2Cartesian {
             }
             result.constructor(con -> {
                 if (isRoot()) {
-                    con.setModifier(Modifier.PUBLIC);
+                    con.setModifier(PUBLIC);
                 }
                 for (FieldDescriptor fd : usedFields) {
                     con.addArgument(fd.typeName(), fd.fieldName);
@@ -201,6 +204,10 @@ public class Gen2Cartesian {
                 }
                 con.body(bb -> {
                     for (FieldDescriptor fd : usedFields) {
+                        if (!fd.isPrimitive() && !fd.nullValuesPermitted) {
+//                            bb.asserting(fd.fieldName + " != null");
+                            bb.assertingNotNull().expression(fd.fieldName).build();
+                        }
                         bb.statement("this." + lff.generatorFor(fd).localFieldName()
                                 + " = " + fd.fieldName);
                     }
@@ -213,7 +220,8 @@ public class Gen2Cartesian {
                 });
             });
             UnsetCheckerFactory<C> ucf = UnsetCheckerFactory.create(result, desc, lff);
-            SetterMethodFactory<C> smf = SetterMethodFactory.create(result, desc, lff, ucf);
+            ValidationMethodFactory<C> vmf = ValidationMethodFactory.create(result, desc);
+            SetterMethodFactory<C> smf = SetterMethodFactory.create(result, desc, lff, ucf, vmf);
             for (FieldDescriptor fd : optionalFields) {
                 smf.generatorFor(fd).generate();
             }
@@ -222,24 +230,22 @@ public class Gen2Cartesian {
                 for (FieldDescriptor fd : unusedFields) {
                     result.method("with" + capitalize(fd.fieldName), mb -> {
                         if (fd.canBeVarargs()) {
-                            mb.withModifier(Modifier.FINAL)
+                            mb.withModifier(FINAL)
                                     .annotatedWith("SafeVarargs").closeAnnotation();
                         }
                         mb.addArgument(fd.parameterTypeName(), fd.fieldName);
                         OneBuilderModel next = forFields(omitting(fd, unusedFields), including(fd, usedFields));
                         mb.returning(next.nameWithImplicitGenerics());
-                        mb.withModifier(Modifier.PUBLIC);
+                        mb.withModifier(PUBLIC);
                         mb.docComment(fd.setterJavadoc());
                         mb.withTypeParams(addedGenerics(next));
 
                         if (fd.canBeVarargs()) {
-                            mb.withModifier(Modifier.FINAL);
+                            mb.withModifier(FINAL);
                         }
                         mb.body(bb -> {
-//                            generateNullCheck(fd, bb);
-//                            generateConstraintsTest(result, bb, fd);
                             bb.returningNew(nb -> {
-                                next.applyArgs(result, nb, lff, fd);
+                                next.applyArgs(result, ucf, nb, lff, fd, vmf);
                                 nb.ofType(next.nameWithImplicitGenerics());
                             });
                         });
@@ -250,11 +256,11 @@ public class Gen2Cartesian {
                 List<String> methodGens = desc.genericsRequiredFor(Collections.singleton(last));
                 result.method("buildWith" + capitalize(last.fieldName), mb -> {
                     mb.addArgument(last.parameterTypeName(), last.fieldName);
-                    mb.withModifier(Modifier.PUBLIC);
+                    mb.withModifier(PUBLIC);
                     mb.docComment(last.setterJavadoc());
                     mb.returning(desc.targetTypeName);
                     if (last.canBeVarargs()) {
-                        mb.withModifier(Modifier.FINAL)
+                        mb.withModifier(FINAL)
                                 .annotatedWith("SafeVarargs").closeAnnotation();
                     }
                     for (String mg : methodGens) {
@@ -270,19 +276,24 @@ public class Gen2Cartesian {
                     });
                     mb.body(bb -> {
                         generateNullCheck(last, bb);
+                        Set<FieldDescriptor> optionals = desc.optionalFields();
                         bb.returningNew(nb -> {
                             for (FieldDescriptor fd : desc.fields()) {
+                                Optional<Defaulter> def = fd.defaulter;
                                 if (fd != last) {
-                                    nb.withArgument(lff.generatorFor(fd).localFieldName());
+                                    if (def.isPresent()) {
+                                        def.get().generate(lff.generatorFor(fd).localFieldName(), ucf.generatorFor(fd), nb.withArgument(), result);
+                                    } else {
+                                        nb.withArgument(lff.generatorFor(fd).localFieldName());
+                                    }
                                 } else {
-                                    generateInlineConstraintsTest(result, nb, fd);
+                                    generateInlineConstraintsTest(result, ucf, nb, fd, def, vmf);
                                 }
                             }
                             boolean hasGenerics = !desc.genericsRequiredFor(desc.fields()).isEmpty();
                             nb.ofType(desc.targetTypeName + (hasGenerics ? "<>" : ""));
                         });
                     });
-
                 });
             }
             result.build();
@@ -301,81 +312,44 @@ public class Gen2Cartesian {
             }
         }
 
-        private <C> String generateConstraintsStaticMethod(ClassBuilder<C> result,
-                FieldDescriptor fd) {
-            ClassBuilder<?> top = result.topLevel();
-            String failMethod = "fail__";
-            if (!top.containsMethodNamed(failMethod)) {
-                top.method(failMethod, mb -> {
-                    mb.withTypeParam("X")
-                            .returning("X")
-                            .addArgument("String", "msg")
-                            .withModifier(STATIC, PRIVATE)
-                            .body()
-                            .andThrow().withArgument("msg")
-                            .ofType("IllegalArgumentException");
-                });
+        public <C, T, I extends InvocationBuilderBase<T, I>> void generateInlineConstraintsTest(ClassBuilder<C> bldr,
+                UnsetCheckerFactory<C> ucf,
+                I ib, FieldDescriptor fd, Optional<Defaulter> def,
+                ValidationMethodFactory<C> vmf) {
+            if (def.isPresent()) {
+                Optional<String> vmeth = vmf.generator(fd).validationMethod();
+                if (vmeth.isPresent()) {
+                    ClassBuilder.ValueExpressionBuilder<InvocationBuilder<I>> veb = ib.withArgumentFromInvoking(
+                            vmeth.get())
+                            .withArgument();
+                    def.get().generate(fd.fieldName, ucf.generatorFor(fd), veb, bldr).inScope();
+                } else {
+                    ClassBuilder.ValueExpressionBuilder<I> veb = ib.withArgument();
+                    def.get().generate(fd.fieldName, ucf.generatorFor(fd), veb, bldr);
+                }
+            } else {
+                Optional<String> valMethod = vmf.generator(fd).validationMethod();
+                if (valMethod.isPresent()) {
+                    ib.withArgumentFromInvoking(valMethod.get())
+                            .withArgument(fd.fieldName).inScope();
+                } else {
+                    ib.withArgument(fd.fieldName);
+                }
             }
-            String validateMethod = "validate" + capitalize(fd.fieldName) + "__";
-            if (!top.containsMethodNamed(validateMethod)) {
-                top.method(validateMethod, mb -> {
-                    mb.withTypeParams(desc.genericsRequiredFor(Collections.singleton(fd)));
-                    mb.addArgument(fd.typeName(), fd.fieldName)
-                            .withModifier(PRIVATE, STATIC)
-                            .returning(fd.typeName())
-                            .body(bb -> {
-                                if (!fd.isPrimitive()) {
-                                    bb.ifNull(fd.fieldName)
-                                            .returningInvocationOf(failMethod)
-                                            .withStringConcatentationArgument(
-                                                    fd.typeName()).append(" parameter ")
-                                            .append(fd.fieldName)
-                                            .append(" may not be null.")
-                                            .endConcatenation().inScope();
-                                }
-
-                                List<ConstraintGenerator> cgs = fd.constraintsSorted();
-                                for (ConstraintGenerator cg : cgs) {
-                                    cg.decorateClass(result.topLevel());
-                                    bb.lineComment("Weight " + cg.weight() + " " + cg.getClass().getSimpleName());
-                                    cg.generate(fd.fieldName, result.topLevel().className(), failMethod, desc.utils(), bb, fd.fieldName);
-                                }
-
-                                bb.returning(fd.fieldName);
-                            });
-                });
-            }
-            return validateMethod;
         }
 
-        public <C> void generateConstraintsTest(ClassBuilder<C> bldr,
-                ClassBuilder.BlockBuilder<?> bb, FieldDescriptor fd) {
-
-            bb.invoke(generateConstraintsStaticMethod(bldr, fd))
-                    .withArgument(fd.fieldName).inScope();
-        }
-
-        public <C> void generateInlineConstraintsTest(ClassBuilder<C> bldr,
-                InvocationBuilderBase<?, ?> ib, FieldDescriptor fd) {
-
-            ib.withArgumentFromInvoking(generateConstraintsStaticMethod(bldr, fd))
-                    .withArgument(fd.fieldName).inScope();
-        }
-
-        private void applyArgs(ClassBuilder<?> bldr, NewBuilder<?> nb, LocalFieldFactory<?> lff,
-                FieldDescriptor adding) {
+        private <C, N extends NewBuilder<T>, T> void applyArgs(ClassBuilder<C> bldr, UnsetCheckerFactory<C> ucf, N nb, LocalFieldFactory<C> lff,
+                FieldDescriptor adding, ValidationMethodFactory<C> vmf) {
             for (FieldDescriptor fd : usedFields) {
                 if (adding == fd) {
-                    generateInlineConstraintsTest(bldr, nb, fd);
-//                    nb.withArgument(fd.fieldName);
+                    generateInlineConstraintsTest(bldr, ucf, nb, fd, fd.defaulter, vmf);
                 } else {
                     nb.withArgument(lff.generatorFor(fd).localFieldName());
                 }
             }
             for (FieldDescriptor fd : optionalFields) {
                 if (adding == fd) {
-                    generateInlineConstraintsTest(bldr, nb, fd);
-//                    nb.withArgument(fd.fieldName);
+                    generateInlineConstraintsTest(bldr, ucf, nb, fd, fd.defaulter, vmf);
                 } else {
                     nb.withArgument(lff.generatorFor(fd).localFieldName());
                 }

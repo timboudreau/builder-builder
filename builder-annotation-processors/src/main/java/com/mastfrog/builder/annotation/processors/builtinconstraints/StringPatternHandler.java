@@ -67,9 +67,10 @@ public class StringPatternHandler implements ConstraintHandler {
             String pat = utils.annotationValue(mir, "value", String.class, ".*");
             minLength = utils.annotationValue(mir, "minLength", Integer.class, 0);
             maxLength = utils.annotationValue(mir, "maxLength", Integer.class, 0);
-            if (!".*".equals(pat)) {
+            if (pat != null && !".*".equals(pat) && !pat.isEmpty()) {
                 Pattern p = null;
                 try {
+                    System.out.println("COMPILE PATTERN '" + pat + "'");
                     p = Pattern.compile(pat);
                 } catch (Exception | Error e) {
                     utils.fail("Invalid regular expression '" + pat + "'", ve, mir);
@@ -89,6 +90,13 @@ public class StringPatternHandler implements ConstraintHandler {
                 utils.fail("Max length " + maxLength + " is less than zero.", ve, mir);
             }
             this.nullable = nullable;
+        }
+
+        @Override
+        public String toString() {
+            return "StringPatternConstraintGenerator{" + "pattern=" + pattern
+                    + ", minLength=" + minLength + ", maxLength=" + maxLength
+                    + ", varName=" + varName + ", nullable=" + nullable + '}';
         }
 
         @Override

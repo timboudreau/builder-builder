@@ -21,7 +21,6 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-
 package com.mastfrog.builder.annotations.constraint;
 
 import static java.lang.annotation.ElementType.PARAMETER;
@@ -30,12 +29,14 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import java.lang.annotation.Target;
 
 /**
+ * <i>Inclusive</i> minimum int value.
  *
  * @author Tim Boudreau
  */
 @Retention(RUNTIME)
 @Target(PARAMETER)
-@AppliesTo({Integer.class, int.class})
+@AppliesTo({Integer.class, int.class, int[].class})
 public @interface IntMin {
+
     int value();
 }

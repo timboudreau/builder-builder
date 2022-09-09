@@ -29,7 +29,6 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumSet;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -55,10 +54,12 @@ import javax.lang.model.type.WildcardType;
 import javax.lang.model.util.AbstractTypeVisitor9;
 
 /**
+ * Dissects the generics associated with an entire type, and extracts which
+ * fields each is associated with.
  *
  * @author Tim Boudreau
  */
-public class GenericsAnalyzer {
+final class GenericsAnalyzer {
 
     private TypeMirror targetType;
     private final ExecutableElement target;
@@ -74,41 +75,15 @@ public class GenericsAnalyzer {
         }
 
         TV tv = new TV();
-        System.out.println("ANALYZE " + el + " as " + targetType + " " + targetType.getClass().getSimpleName());
         returnTypeModel = new GenericsModel();
         targetType.accept(tv, returnTypeModel);
-        System.out.println("MODEL:");
 
-        System.out.println("TPE VARS " + returnTypeModel.allOfKind(TypeKind.TYPEVAR));
-
-        System.out.println(returnTypeModel);
         Map<String, GenericsModel> forParam = new LinkedHashMap<>();
         el.getParameters().forEach(ve -> {
             GenericsModel curr = new GenericsModel();
             TV v = new TV();
             ve.asType().accept(v, curr);
             modelForParameter.put(ve.getSimpleName().toString(), curr);
-//            System.out.println("\nPARAM " + ve.getSimpleName());
-//            System.out.println(curr);
-
-            System.out.println("generics for " + ve.getSimpleName());
-            Set<TypeModel> gens = genericsRequiredFor(ve.getSimpleName().toString());
-            System.out.println(gens);
-            System.out.println("QUALIFIED:");
-            for (TypeModel tm : gens) {
-                System.out.println(" * " + tm + " -> " + nameWithBound(tm.toString()));
-            }
-
-//            System.out.println(ve.getSimpleName() + " ISECT: " + returnTypeModel.intersection(curr));
-//            System.out.println(curr);
-        });
-
-        System.out.println("\nALL TYPES: ");
-        for (TypeModel m : all()) {
-            System.out.println(" - " + m + "\t" + m.kind() + "\t" + m.mir.getClass().getSimpleName());
-        }
-        returnTypeModel.relationships.forEach((par, rels) -> {
-            System.out.println(" ** " + par + ":\t" + rels);
         });
     }
 
@@ -135,10 +110,7 @@ public class GenericsAnalyzer {
         StringBuilder result = new StringBuilder(genericType);
         for (Map.Entry<ModelPair, Set<Relationship>> e : returnTypeModel.relationships.entrySet()) {
             ModelPair pair = e.getKey();
-//            System.out.println("TRY PAIR " + pair + " matching '" + pair.a + "' for '" + target + "': " + e.getValue()
-//                + " match " + pair.headMatches(target));
             if (pair.headMatches(target)) {
-//                System.out.println("HAVE PAIR " + target + ": " + pair + " " + e.getValue());
                 if (e.getValue().contains(Relationship.UPPER_BOUND)) {
                     TypeModel bnd = pair.b;
                     if (bnd.kind() == TypeKind.NONE || bnd.kind() == TypeKind.NULL) {

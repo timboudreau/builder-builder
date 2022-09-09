@@ -24,8 +24,8 @@
 package com.mastfrog.builder.annotations;
 
 import static java.lang.annotation.ElementType.PARAMETER;
-import java.lang.annotation.Retention;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
+import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
 /**
@@ -49,7 +49,7 @@ import java.lang.annotation.Target;
  */
 @Retention(RUNTIME)
 @Target(PARAMETER)
-public @interface Nullable {
+public @interface Optionally {
 
     /**
      * For types that have a reasonable "null value" - zero for numbers, empty
@@ -65,8 +65,8 @@ public @interface Nullable {
      * </p>
      * <ul>
      * <li><code>Any Number or Character type</code> -- zero</li>
-     * <li><i>Any array type</i> -- An empty array of that type (including
-     * type variables)</li>
+     * <li><i>Any array type</i> -- An empty array of that type (including type
+     * variables)</li>
      * <li><code>String</code> -- Empty string</li>
      * <li><code>CharSequence</code> -- Empty string</li>
      * <li><code>StringBuilder</code> -- New instance</li>
@@ -120,4 +120,12 @@ public @interface Nullable {
      * @return a boolean
      */
     boolean booleanDefault() default false;
+
+    /**
+     * If true, then builders should not throw an exception if null is passed to
+     * a setter method.
+     *
+     * @return false by default
+     */
+    boolean acceptNull() default false;
 }

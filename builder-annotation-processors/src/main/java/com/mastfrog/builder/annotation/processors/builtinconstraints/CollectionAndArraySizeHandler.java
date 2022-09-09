@@ -43,11 +43,11 @@ import javax.lang.model.type.TypeMirror;
 public class CollectionAndArraySizeHandler implements ConstraintHandler {
 
     @Override
-    public void collect(AnnotationUtils utils, Element targetElement, VariableElement parameterElement, Consumer<ConstraintGenerator> genConsumer) {
+    public void collect(AnnotationUtils utils, Element targetElement, VariableElement parameterElement,
+            Consumer<ConstraintGenerator> genConsumer) {
         AnnotationMirror mir = utils.findAnnotationMirror(parameterElement,
                 "com.mastfrog.builder.annotations.constraint.CollectionConstraint");
         if (mir == null) {
-            System.out.println("NO MIRROR FOR " + parameterElement.getSimpleName() + " " + parameterElement.asType());
             return;
         }
         TypeMirror type = utils.erasureOf(parameterElement.asType());
@@ -121,7 +121,8 @@ public class CollectionAndArraySizeHandler implements ConstraintHandler {
 
     private static final class ArrayConstraintGenerator extends AbstractGenerator {
 
-        public ArrayConstraintGenerator(int min, int max, boolean noNullElements, boolean nullableValue, boolean isList, TypeMirror checkedAs) {
+        public ArrayConstraintGenerator(int min, int max, boolean noNullElements,
+                boolean nullableValue, boolean isList, TypeMirror checkedAs) {
             super(min, max, noNullElements, nullableValue, isList, checkedAs);
         }
 
@@ -145,7 +146,9 @@ public class CollectionAndArraySizeHandler implements ConstraintHandler {
         }
 
         @Override
-        public <T, B extends ClassBuilder.BlockBuilderBase<T, B, X>, X> void generate(String fieldVariableName, String problemsListVariableName, String addMethodName, AnnotationUtils utils, B bb, String parameterName) {
+        public <T, B extends ClassBuilder.BlockBuilderBase<T, B, X>, X> void generate(
+                String fieldVariableName, String problemsListVariableName, String addMethodName,
+                AnnotationUtils utils, B bb, String parameterName) {
             if (nullableValue) {
                 ClassBuilder.IfBuilder<B> iff = bb.ifNotNull(fieldVariableName);
                 applyConstraints(fieldVariableName, problemsListVariableName, addMethodName, iff, parameterName);

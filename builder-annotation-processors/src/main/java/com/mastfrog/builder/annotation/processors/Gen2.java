@@ -46,7 +46,8 @@ public class Gen2 {
         ClassBuilder<String> cb = ClassBuilder
                 .forPackage(desc.packageName())
                 .named(desc.targetTypeName + "Builder")
-                .withModifier(Modifier.PUBLIC, Modifier.FINAL);
+                .withModifier(Modifier.PUBLIC, Modifier.FINAL)
+                .autoToString();
 
         desc.genericsRequiredFor(desc.fields()).forEach(tp -> {
             String qual = desc.generics.nameWithBound(tp);
@@ -58,7 +59,8 @@ public class Gen2 {
         UnsetCheckerFactory<String> usc = new UnsetCheckerFactory<String>(cb, styles, desc, lff::generatorFor);
         lff.generate();
 
-        SetterMethodFactory<String> smf = new SetterMethodFactory<>(cb, desc.styles, lff::generatorFor, desc, usc::generatorFor);
+        ValidationMethodFactory<String> vmf = ValidationMethodFactory.create(cb, desc);
+        SetterMethodFactory<String> smf = new SetterMethodFactory<>(cb, desc.styles, lff::generatorFor, desc, usc::generatorFor, vmf);
         BuildMethodFactory<String> bmf = new BuildMethodFactory<>(cb, desc, usc, lff::generatorFor);
 
         smf.generate();

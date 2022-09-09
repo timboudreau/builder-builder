@@ -41,18 +41,20 @@ import javax.lang.model.type.TypeMirror;
 @ServiceProvider(ConstraintHandler.class)
 public class DoubleMinMaxHandler implements ConstraintHandler {
 
-    private static final String INT_MIN = "com.mastfrog.builder.annotations.constraint.DoubleMin";
-    private static final String INT_MAX = "com.mastfrog.builder.annotations.constraint.DoubleMax";
+    private static final String DBL_MIN = "com.mastfrog.builder.annotations.constraint.DoubleMin";
+    private static final String DBL_MAX = "com.mastfrog.builder.annotations.constraint.DoubleMax";
 
     @Override
     public void collect(AnnotationUtils utils, Element targetElement, VariableElement parameterElement,
             Consumer<ConstraintGenerator> genConsumer) {
-        AnnotationMirror min = utils.findAnnotationMirror(parameterElement, INT_MIN);
-        AnnotationMirror max = utils.findAnnotationMirror(parameterElement, INT_MAX);
+        AnnotationMirror min = utils.findAnnotationMirror(parameterElement, DBL_MIN);
+        AnnotationMirror max = utils.findAnnotationMirror(parameterElement, DBL_MAX);
         if (min != null || max != null) {
             TypeMirror paramType = parameterElement.asType();
-            if (!utils.isAssignable(paramType, Double.class.getName()) && !utils.isAssignable(paramType, Double.class.getName())) {
-                utils.fail("Cannot apply DoubleMin or DoubleMax to a " + paramType, parameterElement, (min == null ? min : max));
+            if (!utils.isAssignable(paramType, Double.class.getName())
+                    && !utils.isAssignable(paramType, Double.class.getName())) {
+                utils.fail("Cannot apply DoubleMin or DoubleMax to a " + paramType,
+                        parameterElement, (min == null ? min : max));
                 return;
             }
         }

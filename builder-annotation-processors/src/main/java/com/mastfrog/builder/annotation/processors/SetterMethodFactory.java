@@ -29,12 +29,18 @@ import com.mastfrog.builder.annotation.processors.BuilderDescriptors.BuilderDesc
 import com.mastfrog.builder.annotation.processors.UnsetCheckerFactory.UnsetCheckGenerator;
 import com.mastfrog.builder.annotation.processors.spi.ConstraintGenerator;
 import com.mastfrog.java.vogon.ClassBuilder;
+import com.mastfrog.java.vogon.ClassBuilder.AssignmentBuilder;
+import com.mastfrog.java.vogon.ClassBuilder.ValueExpressionBuilder;
 import static com.mastfrog.java.vogon.ClassBuilder.variable;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 import javax.lang.model.element.Modifier;
+import static javax.lang.model.element.Modifier.PRIVATE;
+import static javax.lang.model.element.Modifier.STATIC;
 
 /**
  *
@@ -49,22 +55,25 @@ public class SetterMethodFactory<C> {
     private final Map<FieldDescriptor, SetterMethodGenerator> generatorForField = new HashMap<>();
     private String failMethod;
     private final Function<FieldDescriptor, UnsetCheckGenerator> checkers;
+    private final ValidationMethodFactory<C> validations;
 
     public SetterMethodFactory(ClassBuilder<C> bldr, Set<BuilderStyles> styles,
             Function<? super BuilderDescriptor.FieldDescriptor, ? extends LocalFieldFactory.LocalFieldGenerator> fields,
             BuilderDescriptor desc,
-            Function<FieldDescriptor, UnsetCheckGenerator> checkers) {
+            Function<FieldDescriptor, UnsetCheckGenerator> checkers,
+            ValidationMethodFactory<C> validations) {
         this.bldr = bldr;
         this.styles = styles;
         this.fields = fields;
         this.desc = desc;
         this.checkers = checkers;
+        this.validations = validations;
     }
 
     static <C> SetterMethodFactory<C> create(ClassBuilder<C> bldr, BuilderDescriptor desc,
-            LocalFieldFactory lff, UnsetCheckerFactory unset) {
+            LocalFieldFactory lff, UnsetCheckerFactory unset, ValidationMethodFactory<C> validations) {
         return new SetterMethodFactory<>(bldr, desc.styles, lff::generatorFor, desc,
-                unset::generatorFor);
+                unset::generatorFor, validations);
     }
 
     public SetterMethodGenerator generatorFor(FieldDescriptor fd) {
@@ -107,9 +116,67 @@ public class SetterMethodFactory<C> {
     class SetterMethodGeneratorImpl implements SetterMethodGenerator {
 
         private final FieldDescriptor field;
+        private String validationMethod;
 
         public SetterMethodGeneratorImpl(FieldDescriptor field) {
             this.field = field;
+        }
+
+        private String validationMethod() {
+            if (validationMethod != null) {
+                return validationMethod;
+            }
+            validationMethod = "__validate" + capitalize(field.fieldName) + "__";
+            ClassBuilder<?> top = bldr.topLevel();
+            if (top.containsMethodNamed(validationMethod)) {
+                return validationMethod;
+            }
+            top.method(validationMethod, mb -> {
+                mb.withModifier(PRIVATE, STATIC);
+                mb.addArgument(field.typeName(), field.fieldName);
+                mb.returning(field.typeName());
+                mb.docComment("Validates the parameter <code>" + field.fieldName
+                        + "</code> of type <code>" + field.typeName() + "</code>.");
+                boolean noNullCheck
+                        = field.isPrimitive()
+                        || (field.optional && !field.nullValuesPermitted);
+                List<String> gfc = desc.genericsRequiredFor(Collections.singleton(field));
+                if (!gfc.isEmpty()) {
+                    for (String g : gfc) {
+                        mb.withTypeParam(desc.generics.nameWithBound(g));
+                    }
+                }
+                List<ConstraintGenerator> cs = field.constraintsSorted();
+                mb.body(bb -> {
+                    if (!noNullCheck) {
+                        bb.ifNull(field.fieldName)
+                                .andThrow(nb -> {
+                                    nb.withStringConcatentationArgument(field.fieldName)
+                                            .append(" may not be null.")
+                                            .endConcatenation()
+                                            .ofType("IllegalArgumentException");
+                                }).endIf();
+                        if (!cs.isEmpty()) {
+                            ClassBuilder.IfBuilder<?> inn = bb.ifNotNull(field.fieldName);
+                            for (ConstraintGenerator c : field.constraintsSorted()) {
+                                c.decorateClass(top);
+                                bb.lineComment(c + "");
+                                c.generate(field.fieldName, top.className(), failMethod(), desc.utils(), inn, field.fieldName);
+                            }
+                            inn.endIf();
+                        }
+                    } else if (!cs.isEmpty()) {
+                        for (ConstraintGenerator c : field.constraintsSorted()) {
+                            bb.lineComment(c + "");
+                            c.decorateClass(top);
+                            c.generate(field.fieldName, top.className(),
+                                    failMethod(), desc.utils(), bb, field.fieldName);
+                        }
+                    }
+                    bb.returning(field.fieldName);
+                });
+            });
+            return validationMethod;
         }
 
         @Override
@@ -129,25 +196,12 @@ public class SetterMethodFactory<C> {
                         .docComment(field.setterJavadoc())
                         .returning(bldr.parameterizedClassName(false))
                         .body(bb -> {
-                            if (nullable && !field.optional) {
-                                bb.ifNull(field.fieldName)
-                                        .andThrow(nb -> {
-                                            nb.withStringConcatentationArgument("Parameter '")
-                                                    .append(field.fieldName)
-                                                    .append("' may not be null.")
-                                                    .endConcatenation()
-                                                    .ofType("IllegalArgumentException");
-                                        })
-                                        .endIf();
-                            }
                             String builderField = fields.apply(field).localFieldName();
-                            for (ConstraintGenerator c : field.constraintsSorted()) {
-                                c.decorateClass(bldr.topLevel());
-                                c.generate(field.fieldName, bldr.topLevel().className(), failMethod(), desc.utils(), bb, field.fieldName);
-                            }
+
+                            validations.generator(field).assign(field.fieldName, bb.assign("this." + builderField)
+                                    .to());
                             checkers.apply(field).onSet(bb);
-                            bb.assign("this." + builderField)
-                                    .toExpression(field.fieldName);
+
                             bb.returningThis();
                         });
             });

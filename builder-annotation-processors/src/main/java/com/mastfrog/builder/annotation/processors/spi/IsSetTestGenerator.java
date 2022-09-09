@@ -23,18 +23,18 @@
  */
 package com.mastfrog.builder.annotation.processors.spi;
 
-import com.mastfrog.java.vogon.ClassBuilder;
-import com.mastfrog.java.vogon.ClassBuilder.BlockBuilderBase;
 import com.mastfrog.java.vogon.ClassBuilder.ConditionBuilder;
 import com.mastfrog.java.vogon.ClassBuilder.ValueExpressionBuilder;
 
 /**
+ * A thing that can generate a test of whether or not a variable has been set
+ * during the lifetime of a builder.
  *
  * @author Tim Boudreau
  */
 public interface IsSetTestGenerator {
 
     public <X> ValueExpressionBuilder<ValueExpressionBuilder<X>> isSetTest(
-                    ConditionBuilder<ValueExpressionBuilder<ValueExpressionBuilder<X>>> tern);
+            ConditionBuilder<ValueExpressionBuilder<ValueExpressionBuilder<X>>> tern);
 
 }

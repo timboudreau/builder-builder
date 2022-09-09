@@ -26,7 +26,6 @@ package com.mastfrog.builder.annotation.processors;
 import com.mastfrog.annotation.AnnotationUtils;
 import static com.mastfrog.annotation.AnnotationUtils.capitalize;
 import static com.mastfrog.annotation.AnnotationUtils.simpleName;
-import static com.mastfrog.builder.annotation.processors.BuilderAnnotationProcessor.NULLABLE;
 import static com.mastfrog.builder.annotation.processors.Utils.combine;
 import com.mastfrog.builder.annotation.processors.spi.ConstraintGenerator;
 import com.mastfrog.builder.annotation.processors.spi.IsSetTestGenerator;
@@ -63,6 +62,7 @@ import javax.lang.model.type.ArrayType;
 import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
 import javax.tools.JavaFileObject;
+import static com.mastfrog.builder.annotation.processors.BuilderAnnotationProcessor.OPTIONALLY;
 
 /**
  *
@@ -204,9 +204,7 @@ final class BuilderDescriptors {
             }
             this.builderName = bn;
             this.targetTypeName = nm;
-            System.out.println("\n\n------ TYPE ANALYSIS ----------");
             generics = new GenericsAnalyzer(utils, (ExecutableElement) e);
-            System.out.println("\n\n--------- END TYPE ANALYSIS --------\n");
         }
 
         public List<FieldDescriptor> fields() {
@@ -443,13 +441,12 @@ final class BuilderDescriptors {
             } else if (reqCount == 0) {
                 flat = true;
             }
-            System.out.println("GENERATE " + builderName);
             if (flat) {
 //                return generateFlat();
-                return new Gen2(this, styles).generate();
+                return addGeneratedAnnotation(new Gen2(this, styles).generate()).sortMembers();
             } else {
 //                return new CartesianGenerator.BuilderContext(origin, this).build();
-                return new Gen2Cartesian(this).generate();
+                return addGeneratedAnnotation(new Gen2Cartesian(this).generate()).sortMembers();
             }
         }
 
@@ -602,6 +599,7 @@ final class BuilderDescriptors {
             final boolean optional;
             String fieldName;
             private int primitiveIndex = -1;
+            final boolean nullValuesPermitted;
 
             Optional<Defaulter> defaulter;
 
@@ -612,12 +610,33 @@ final class BuilderDescriptors {
                 this.constraints = constraints;
                 Defaulter def = null;
                 if (optional) {
-                    AnnotationMirror mir = utils.findAnnotationMirror(var, NULLABLE);
+                    AnnotationMirror mir = utils.findAnnotationMirror(var, OPTIONALLY);
                     if (mir != null) {
                         def = Defaulter.forAnno(var, var.asType(), mir, utils);
+                        nullValuesPermitted = utils.annotationValue(mir, "acceptNull", Boolean.class, Boolean.FALSE);
+                    } else {
+                        nullValuesPermitted = false;
                     }
+                } else {
+                    nullValuesPermitted = false;
                 }
                 defaulter = Optional.ofNullable(def);
+            }
+
+            public boolean isValidatable() {
+                if (!isPrimitive() && optional) {
+                    return !nullValuesPermitted;
+                }
+                if (isReallyPrimitive()) {
+                    return !constraints.isEmpty();
+                }
+                if (isPrimitive() && !optional) {
+                    return !constraints.isEmpty();
+                }
+                if (constraints.isEmpty()) {
+                    return !nullValuesPermitted;
+                }
+                return false;
             }
 
             public List<ConstraintGenerator> constraintsSorted() {
@@ -703,7 +722,6 @@ final class BuilderDescriptors {
             String parameterTypeName() {
                 if (canBeVarargs()) {
                     ArrayType at = (ArrayType) this.var.asType();
-                    System.out.println("USE VARARGS " + at.getComponentType() + "...");
                     return at.getComponentType() + "...";
                 }
                 return typeName();

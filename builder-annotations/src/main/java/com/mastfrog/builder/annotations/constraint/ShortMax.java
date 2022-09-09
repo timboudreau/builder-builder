@@ -29,6 +29,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import java.lang.annotation.Target;
 
 /**
+ * <i>Inclusive</i> maximum short value.
  *
  * @author Tim Boudreau
  */

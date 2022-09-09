@@ -117,11 +117,13 @@ public class UnsetCheckerFactory<C> {
 
     public <T, B extends ClassBuilder.BlockBuilderBase<T, B, X>, X> void generateCheck(
             FieldDescriptor fd, B bb) {
+        bb.lineComment(getClass().getSimpleName());
         generatorFor(fd).generate(bb, bldr.className(), this::failMethod);
     }
 
     public <T, B extends ClassBuilder.BlockBuilderBase<T, B, X>, X> void generateAllChecks(
             B bb, String pn, String addMethod) {
+        bb.lineComment(getClass().getSimpleName());
         Set<FieldDescriptor> primitives = new TreeSet<>();
         Set<FieldDescriptor> nonPrimitives = new TreeSet<>();
         for (FieldDescriptor fd : desc.fields()) {
@@ -190,6 +192,7 @@ public class UnsetCheckerFactory<C> {
 
         @Override
         public <T, B extends BlockBuilderBase<T, B, X>, X> B onSet(B bb) {
+            bb.lineComment(getClass().getSimpleName());
             bb.statement("this." + isSetFieldName() + " = true");
             return bb;
         }
@@ -202,6 +205,7 @@ public class UnsetCheckerFactory<C> {
         @Override
         public <T, B extends ClassBuilder.BlockBuilderBase<T, B, X>, X> boolean generate(
                 B bb, String problemsHolder, Supplier<String> addProblemMethodName) {
+            bb.lineComment(getClass().getSimpleName());
             bb.iff().booleanExpression("!this." + isSetFieldName())
                     .invoke(addProblemMethodName.get())
                     .withStringConcatentationArgument(field.typeName())
@@ -264,6 +268,7 @@ public class UnsetCheckerFactory<C> {
 
         @Override
         public <T, B extends BlockBuilderBase<T, B, X>, X> boolean generate(B bb, String problemsHolder, Supplier<String> addProblemMethodName) {
+            bb.lineComment(getClass().getSimpleName());
             bb.ifNull(localFieldName())
                     .invoke(addProblemMethodName.get())
                     .withStringConcatentationArgument(typeName())
@@ -314,6 +319,7 @@ public class UnsetCheckerFactory<C> {
 
         @Override
         public <T, B extends BlockBuilderBase<T, B, X>, X> B onSet(B bb) {
+            bb.lineComment(getClass().getSimpleName());
             bb.statement(mask().name() + " |= " + mask().fieldType().toExpression(1L << primitiveFieldIndex()));
             return bb;
         }

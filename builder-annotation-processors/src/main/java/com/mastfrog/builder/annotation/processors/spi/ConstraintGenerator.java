@@ -37,7 +37,7 @@ import java.util.function.Consumer;
 @FunctionalInterface
 public interface ConstraintGenerator extends Comparable<ConstraintGenerator> {
 
-    public static final String NULLABLE_ANNOTATION = BuilderAnnotationProcessor.NULLABLE;
+    public static final String NULLABLE_ANNOTATION = BuilderAnnotationProcessor.OPTIONALLY;
 
     /**
      * Generate a test into a method represented by the passed block builder. If

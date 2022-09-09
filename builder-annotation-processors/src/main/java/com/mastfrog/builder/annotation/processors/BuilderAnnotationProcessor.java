@@ -60,7 +60,7 @@ public class BuilderAnnotationProcessor extends AbstractProcessor {
     private BuilderDescriptors descs;
     private ConstraintHandlers handlers;
     static final String ANNO = "com.mastfrog.builder.annotations.GenerateBuilder";
-    public static final String NULLABLE = "com.mastfrog.builder.annotations.Nullable";
+    public static final String OPTIONALLY = "com.mastfrog.builder.annotations.Optionally";
 
     static {
         AnnotationUtils.forceLogging();
@@ -129,7 +129,7 @@ public class BuilderAnnotationProcessor extends AbstractProcessor {
             ExecutableElement ex = (ExecutableElement) el;
             String name = ex.getSimpleName().toString();
             for (VariableElement param : ex.getParameters()) {
-                AnnotationMirror nullableMirror = utils.findAnnotationMirror(param, NULLABLE);
+                AnnotationMirror nullableMirror = utils.findAnnotationMirror(param, OPTIONALLY);
                 String fieldName = param.getSimpleName().toString();
                 handleOneParameter(desc, el, fieldName, nullableMirror != null, param);
             }

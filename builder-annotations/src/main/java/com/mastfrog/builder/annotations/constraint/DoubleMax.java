@@ -21,7 +21,6 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-
 package com.mastfrog.builder.annotations.constraint;
 
 import static java.lang.annotation.ElementType.PARAMETER;
@@ -30,6 +29,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import java.lang.annotation.Target;
 
 /**
+ * <i>Inclusive</i> maximum double value.
  *
  * @author Tim Boudreau
  */
@@ -37,5 +37,6 @@ import java.lang.annotation.Target;
 @Target(PARAMETER)
 @AppliesTo({Double.class, double.class})
 public @interface DoubleMax {
+
     double value();
 }
