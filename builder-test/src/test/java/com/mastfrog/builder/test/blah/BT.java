@@ -41,12 +41,12 @@ public class BT {
 //                    .withOther(new OtherThing("whee")).buildWithWhen(5L)
 //        );
 
-        ComplexThingBuilder ctb = new ComplexThingBuilder();
-        ComplexThing x = ctb.withName("Pooger").withId(23).withIsPretty(true)
-                .withContents(Collections.emptySet())
-                .withOther(new OtherThing("foo"))
-                .withWhen(5)
-                .buildWithWeight(5F);
-        System.out.println("Have an x " + x);
+//        ComplexThingBuilder ctb = new ComplexThingBuilder();
+//        ComplexThing x = ctb.withName("Pooger").withId(23).withIsPretty(true)
+//                .withContents(Collections.emptySet())
+//                .withOther(new OtherThing("foo"))
+//                .withWhen(5)
+//                .buildWithWeight(5F);
+//        System.out.println("Have an x " + x);
     }
 }

@@ -87,13 +87,16 @@ public class BuilderAnnotationProcessor extends AbstractProcessor {
             record(e, mir);
         }
         boolean result = annotateds.isEmpty();
-        if (re.processingOver()) {
-            try {
-                descs.generate();
-            } catch (IOException ex) {
-                utils.fail(Strings.toString(ex));
-            }
+        if (re.processingOver() && re.errorRaised()) {
+            return false;
         }
+//        if (re.processingOver()) {
+        try {
+            descs.generate();
+        } catch (IOException ex) {
+            utils.fail(Strings.toString(ex));
+        }
+//        }
         return result;
     }
 
@@ -118,7 +121,7 @@ public class BuilderAnnotationProcessor extends AbstractProcessor {
             TypeMirror conflict = utils.type(pkg + "." + builderNameFromAnnotation);
             if (conflict != null) {
                 utils.fail("Cannot name a builder '" + pkg + "." + builderNameFromAnnotation + " - "
-                    + "a class named " + builderNameFromAnnotation + " already exists in that package");
+                        + "a class named " + builderNameFromAnnotation + " already exists in that package");
                 return;
             }
         }

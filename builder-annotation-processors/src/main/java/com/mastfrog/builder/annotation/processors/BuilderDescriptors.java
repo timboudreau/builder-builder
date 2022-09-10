@@ -26,7 +26,6 @@ package com.mastfrog.builder.annotation.processors;
 import com.mastfrog.annotation.AnnotationUtils;
 import static com.mastfrog.annotation.AnnotationUtils.capitalize;
 import static com.mastfrog.annotation.AnnotationUtils.simpleName;
-import static com.mastfrog.builder.annotation.processors.Utils.combine;
 import com.mastfrog.builder.annotation.processors.spi.ConstraintGenerator;
 import com.mastfrog.builder.annotation.processors.spi.IsSetTestGenerator;
 import com.mastfrog.java.vogon.ArgumentConsumer;
@@ -63,6 +62,7 @@ import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
 import javax.tools.JavaFileObject;
 import static com.mastfrog.builder.annotation.processors.BuilderAnnotationProcessor.OPTIONALLY;
+import java.util.HashSet;
 
 /**
  *
@@ -83,9 +83,14 @@ final class BuilderDescriptors {
         c.accept(descs.computeIfAbsent(e, e1 -> new BuilderDescriptor(e, styles,
                 builderNameFromAnnotation, codeGenerationVersion)));
     }
+    
+    public void clear() {
+        descs.clear();
+    }
 
     public void generate() throws IOException {
         String oldName = Thread.currentThread().getName();
+        Set<Element> toRemove = new HashSet<>();
         try {
             Filer filer = utils.processingEnv().getFiler();
             for (Map.Entry<Element, BuilderDescriptor> e : descs.entrySet()) {
@@ -97,11 +102,13 @@ final class BuilderDescriptors {
                     try ( OutputStream out = src.openOutputStream()) {
                         out.write(cb.toString().getBytes(UTF_8));
                     }
+                    toRemove.add(e.getKey());
                 } catch (FilerException ex) {
                     ex.printStackTrace(System.err);
                 }
             }
         } finally {
+            toRemove.forEach(descs::remove);
             Thread.currentThread().setName(oldName);
         }
     }
