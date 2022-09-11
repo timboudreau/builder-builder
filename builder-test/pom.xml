@@ -1,37 +1,39 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
     <modelVersion>4.0.0</modelVersion>
+
     <parent>
-        <groupId>com.mastfrog</groupId>
+        <groupId>com.mastfrog.builder</groupId>
         <artifactId>builder-builder-parent</artifactId>
         <version>1.0.0</version>
     </parent>
+
     <groupId>com.mastfrog.builder.test</groupId>
     <artifactId>builder-test</artifactId>
+    <name>builder-builder-tests</name>
+
     <properties>
-        <exec.mainClass>com.mastfrog.builder.test.BuilderTest</exec.mainClass>
+        <skipNexusStagingDeployMojo>true</skipNexusStagingDeployMojo>
         <java.source.level>11</java.source.level>
         <endorsed.dir>${project.build.directory}/generated-sources/annotations</endorsed.dir>
     </properties>
+
     <dependencies>
+
         <dependency>
             <groupId>com.mastfrog</groupId>
             <artifactId>builder-annotations</artifactId>
-            <version>${project.version}</version>
             <scope>provided</scope>
-        </dependency>
-        <dependency>
-            <groupId>com.mastfrog</groupId>
-            <artifactId>builder-api</artifactId>
-            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>com.mastfrog</groupId>
             <artifactId>builder-annotation-processors</artifactId>
-            <version>${project.version}</version>
             <scope>provided</scope>
         </dependency>
+
     </dependencies>
+
     <build>
         <plugins>
             <!--            <plugin>
@@ -56,14 +58,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.3</version>
-                <!--<version>3.10.0</version>-->
                 <configuration>
-                    <source>${java.source.level}</source>
-                    <target>${java.source.level}</target>
-                    <showDeprecation>true</showDeprecation>
-                    <showWarnings>true</showWarnings>
-                    <encoding>UTF-8</encoding>
                     <!--<verbose>true</verbose>-->
                     <!--<maven.compiler.force.javac>true</maven.compiler.force.javac>-->
 
@@ -78,13 +73,10 @@
 
                     <!--<compilerArgument>-proc:none</compilerArgument>-->
                     <!--<compilerArgument>-Xlint:unchecked</compilerArgument>-->
-                    
-                    <compilerArguments>
-                        <endorseddirs>${endorsed.dir}</endorseddirs>
-                    </compilerArguments>
+
                     <compilerArgs>
                         <arg>-Xlint:unchecked</arg>
-                    </compilerArgs>                    
+                    </compilerArgs>
                 </configuration>
             </plugin>
             <plugin>

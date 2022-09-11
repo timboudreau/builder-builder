@@ -8,4 +8,7 @@
 *.iml
 .idea/*
 target/
+nbproject/
+nb-configuration.xml
+*.orig
 
