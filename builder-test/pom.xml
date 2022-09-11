@@ -14,7 +14,6 @@
     <name>builder-builder-tests</name>
 
     <properties>
-        <skipNexusStagingDeployMojo>true</skipNexusStagingDeployMojo>
         <java.source.level>11</java.source.level>
         <endorsed.dir>${project.build.directory}/generated-sources/annotations</endorsed.dir>
     </properties>
