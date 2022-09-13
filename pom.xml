@@ -23,6 +23,7 @@
         <module>builder-annotations</module>
         <module>builder-annotation-processors</module>
         <module>builder-test</module>
+        <module>builder-builder-demo</module>
     </modules>
 
     <properties>
