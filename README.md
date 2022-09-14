@@ -56,3 +56,9 @@ maximum length values.
 `@CollectionConstraint` applies to `java.util.Collection` types, `java.util.Map` types, as well as arrays, and lets you
 set minimum and maximum sizes, forbid null values, and force a type check of each element.
 
+Sample Code
+===========
+
+Take a look at [the demo project code](https://github.com/timboudreau/builder-builder/blob/main/builder-builder-demo/src/test/java/com/timboudreau/bugdemo/attribution/bug/demo/BuilderBuilderDemoTest.java#L32) to get
+a picture of what builder usage looks like in practice, and some descriptoin of what's happening under-the-hood.
+
