@@ -62,6 +62,7 @@ import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
 import javax.tools.JavaFileObject;
 import static com.mastfrog.builder.annotation.processors.BuilderAnnotationProcessor.OPTIONALLY;
+import com.mastfrog.util.strings.Strings;
 import java.util.HashSet;
 
 /**
@@ -77,13 +78,17 @@ final class BuilderDescriptors {
         this.utils = utils;
     }
 
+    public static <T> ClassBuilder<T> initDebug(ClassBuilder<T> c) {
+        return c.generateDebugLogCode();
+    }
+
     public void add(Element e, Set<BuilderStyles> styles, String builderNameFromAnnotation,
             int codeGenerationVersion,
             Consumer<BuilderDescriptor> c) {
         c.accept(descs.computeIfAbsent(e, e1 -> new BuilderDescriptor(e, styles,
                 builderNameFromAnnotation, codeGenerationVersion)));
     }
-    
+
     public void clear() {
         descs.clear();
     }
@@ -487,6 +492,7 @@ final class BuilderDescriptors {
                     .autoToString()) //                    .generateDebugLogCode()
                     .withTypeParameters(fullSignatures(generics.genericNamesRequiredFor(paramForVar.values())));
 
+            initDebug(cb);
             indexPrimitives();
             generateIsSetMethod(cb);
             for (FieldDescriptor fd : paramForVar.values()) {
@@ -793,6 +799,9 @@ final class BuilderDescriptors {
                         sb.append("</ul>\n");
                     }
                 }
+                sb.append("@param ").append(fieldName)
+                        .append(" a ").append(this.var.asType())
+                        .append("\n@return a builder");
                 return sb.toString();
             }
 

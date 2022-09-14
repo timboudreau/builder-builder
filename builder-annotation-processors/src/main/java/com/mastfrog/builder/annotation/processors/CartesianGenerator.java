@@ -29,6 +29,7 @@ import static com.mastfrog.annotation.AnnotationUtils.simpleName;
 import com.mastfrog.builder.annotation.processors.BuilderDescriptors.BuilderDescriptor;
 import com.mastfrog.builder.annotation.processors.BuilderDescriptors.BuilderDescriptor.FieldDescriptor;
 import static com.mastfrog.builder.annotation.processors.BuilderDescriptors.addGeneratedAnnotation;
+import static com.mastfrog.builder.annotation.processors.BuilderDescriptors.initDebug;
 import static com.mastfrog.builder.annotation.processors.Utils.combine;
 import static com.mastfrog.builder.annotation.processors.Utils.including;
 import com.mastfrog.builder.annotation.processors.spi.ConstraintGenerator;
@@ -147,7 +148,7 @@ public class CartesianGenerator {
             if (parent == null) {
                 List<String> genericsForOptionals = desc.initialGenerics(GenericSignatureKind.EXPLICIT_BOUNDS);
 
-                parent = addGeneratedAnnotation(ClassBuilder.forPackage(desc.packageName())
+                parent = initDebug(addGeneratedAnnotation(ClassBuilder.forPackage(desc.packageName())
                         .named(desc.builderName))
                         .withModifier(Modifier.FINAL)
                         .withTypeParameters(genericsForOptionals)
@@ -162,7 +163,7 @@ public class CartesianGenerator {
                                 con.setModifier(Modifier.PUBLIC)
                                         .body().endBlock();
                             });
-                        });
+                        }));
 //                parent.generateDebugLogCode();
                 desc.decorateClassWithConstraints(parent);
                 if (desc.instanceType != null) {
@@ -367,6 +368,11 @@ public class CartesianGenerator {
                                 }
                             })
                             .body(bb -> {
+                                bb.lineComment("b. TargetType " + desc.targetTypeName);
+                                bb.lineComment("b. TargetFqn " + desc.targetFqn());
+                                bb.lineComment("b. fullTargetGenerics " + desc.fullTargetGenerics());
+                                bb.lineComment("b. fullTargetGenericSignature " + desc.fullTargetGenericSignature());
+
                                 if (!last.isPrimitive()) {
                                     bb.ifNull(last.fieldName)
                                             .andThrow(nb -> {

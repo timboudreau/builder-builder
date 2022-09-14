@@ -26,11 +26,11 @@ package com.mastfrog.builder.annotation.processors;
 import static com.mastfrog.annotation.AnnotationUtils.capitalize;
 import com.mastfrog.builder.annotation.processors.BuilderDescriptors.BuilderDescriptor;
 import com.mastfrog.builder.annotation.processors.BuilderDescriptors.BuilderDescriptor.FieldDescriptor;
+import static com.mastfrog.builder.annotation.processors.BuilderDescriptors.initDebug;
 import static com.mastfrog.builder.annotation.processors.Utils.combine;
 import static com.mastfrog.builder.annotation.processors.Utils.including;
 import static com.mastfrog.builder.annotation.processors.Utils.omitting;
 import static com.mastfrog.builder.annotation.processors.Utils.sorted;
-import com.mastfrog.builder.annotation.processors.spi.ConstraintGenerator;
 import com.mastfrog.java.vogon.ClassBuilder;
 import com.mastfrog.java.vogon.ClassBuilder.InvocationBuilder;
 import com.mastfrog.java.vogon.ClassBuilder.InvocationBuilderBase;
@@ -44,9 +44,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import javax.lang.model.element.Modifier;
 import static javax.lang.model.element.Modifier.FINAL;
-import static javax.lang.model.element.Modifier.PRIVATE;
 import static javax.lang.model.element.Modifier.PUBLIC;
 import static javax.lang.model.element.Modifier.STATIC;
 import javax.lang.model.type.TypeKind;
@@ -65,10 +63,10 @@ public class Gen2Cartesian {
     }
 
     ClassBuilder<String> generate() {
-        ClassBuilder<String> cb = ClassBuilder.forPackage(desc.packageName())
+        ClassBuilder<String> cb = initDebug(ClassBuilder.forPackage(desc.packageName())
                 .named(desc.builderName)
                 .withModifier(PUBLIC, FINAL)
-                .autoToString();
+                .autoToString());
         initTree();
         List<OneBuilderModel> models = new ArrayList<>(this.models.values());
         Collections.sort(models, (a, b) -> {
@@ -205,8 +203,13 @@ public class Gen2Cartesian {
                 con.body(bb -> {
                     for (FieldDescriptor fd : usedFields) {
                         if (!fd.isPrimitive() && !fd.nullValuesPermitted) {
-//                            bb.asserting(fd.fieldName + " != null");
-                            bb.assertingNotNull().expression(fd.fieldName).build();
+                            bb.iff().isNull(fd.fieldName)
+                                    .endCondition().andThrow(nb -> {
+                                        nb.withStringConcatentationArgument(fd.fieldName)
+                                                .append(" may not be null.")
+                                                .endConcatenation()
+                                                .ofType("IllegalArgumentException");
+                                    }).endIf();
                         }
                         bb.statement("this." + lff.generatorFor(fd).localFieldName()
                                 + " = " + fd.fieldName);
@@ -254,11 +257,14 @@ public class Gen2Cartesian {
             } else if (unusedFields.size() == 1) {
                 FieldDescriptor last = unusedFields.iterator().next();
                 List<String> methodGens = desc.genericsRequiredFor(Collections.singleton(last));
+                String typeToBuild = desc.targetTypeName;
+                String retGenerics = desc.fullTargetGenerics();
+
                 result.method("buildWith" + capitalize(last.fieldName), mb -> {
                     mb.addArgument(last.parameterTypeName(), last.fieldName);
                     mb.withModifier(PUBLIC);
                     mb.docComment(last.setterJavadoc());
-                    mb.returning(desc.targetTypeName);
+                    mb.returning(typeToBuild + retGenerics);
                     if (last.canBeVarargs()) {
                         mb.withModifier(FINAL)
                                 .annotatedWith("SafeVarargs").closeAnnotation();
@@ -275,6 +281,11 @@ public class Gen2Cartesian {
                         mb.throwing(thrown.toString());
                     });
                     mb.body(bb -> {
+                        bb.lineComment("a. TargetType " + desc.targetTypeName);
+                        bb.lineComment("a. TargetFqn " + desc.targetFqn());
+                        bb.lineComment("a. fullTargetGenerics " + desc.fullTargetGenerics());
+                        bb.lineComment("a. fullTargetGenericSignature " + desc.fullTargetGenericSignature());
+
                         generateNullCheck(last, bb);
                         Set<FieldDescriptor> optionals = desc.optionalFields();
                         bb.returningNew(nb -> {

@@ -5,27 +5,27 @@
     <parent>
         <groupId>com.mastfrog.builder</groupId>
         <artifactId>builder-builder-parent</artifactId>
-        <version>1.0.0</version>
+        <version>1.0.1</version>
     </parent>
-    
+
     <artifactId>builder-builder-demo</artifactId>
     <name>builder-builder-demo</name>
 
     <dependencies>
 
-        <!-- 
-            Note: builder-builder entails NO runtime dependencies - 
+        <!--
+            Note: builder-builder entails NO runtime dependencies -
             the annotations are compile-time only, and dependencies
             of the code generator do not pollute the classpath of
             projects that use it, as it should be.
         -->
         <dependency>
-            <groupId>com.mastfrog</groupId>
+            <groupId>com.mastfrog.builder</groupId>
             <artifactId>builder-annotations</artifactId>
             <scope>provided</scope>
         </dependency>
         <dependency>
-            <groupId>com.mastfrog</groupId>
+            <groupId>com.mastfrog.builder</groupId>
             <artifactId>builder-annotation-processors</artifactId>
             <scope>provided</scope>
         </dependency>
@@ -45,5 +45,19 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
+    
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-javadoc-plugin</artifactId>
+                <configuration>
+                    <source>${java.source.level}</source>
+                    <detectJavaApiLink>false</detectJavaApiLink>
+                    <sourcepath>${basedir}/src/main/java:${basedir}/target/generated-sources/annotations</sourcepath>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
 
 </project>

@@ -353,8 +353,14 @@ public abstract class Defaulter {
                             .withTypeParam("T")
                             .addVarArgArgument("T", "_empty")
                             .lineComment("// " + Long.MAX_VALUE)
-                            .asserting(cond -> {
-                                cond.literal(0).isEqualTo().field("length").of("_empty");
+                            .iff(cond -> {
+                                cond.literal(0).isEqualTo().field("length").of("_empty")
+                                        .andThrow(nb -> {
+                                            nb.withStringConcatentationArgument(localName)
+                                                    .append(" may not be null")
+                                                    .endConcatenation()
+                                                    .ofType("IllegalArgumentException");
+                                        });
                             })
                             .returning("_empty").endBlock();
                 });

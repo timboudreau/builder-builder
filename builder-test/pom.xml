@@ -6,27 +6,22 @@
     <parent>
         <groupId>com.mastfrog.builder</groupId>
         <artifactId>builder-builder-parent</artifactId>
-        <version>1.0.0</version>
+        <version>1.0.1</version>
     </parent>
 
     <groupId>com.mastfrog.builder.test</groupId>
     <artifactId>builder-test</artifactId>
     <name>builder-builder-tests</name>
 
-    <properties>
-        <java.source.level>11</java.source.level>
-        <endorsed.dir>${project.build.directory}/generated-sources/annotations</endorsed.dir>
-    </properties>
-
     <dependencies>
 
         <dependency>
-            <groupId>com.mastfrog</groupId>
+            <groupId>com.mastfrog.builder</groupId>
             <artifactId>builder-annotations</artifactId>
             <scope>provided</scope>
         </dependency>
         <dependency>
-            <groupId>com.mastfrog</groupId>
+            <groupId>com.mastfrog.builder</groupId>
             <artifactId>builder-annotation-processors</artifactId>
             <scope>provided</scope>
         </dependency>
@@ -35,87 +30,15 @@
 
     <build>
         <plugins>
-            <!--            <plugin>
-                <groupId>org.codehaus.mojo</groupId>
-                <artifactId>build-helper-maven-plugin</artifactId>
-                <version>3.1.0</version>
-                <executions>
-                    <execution>
-                        <id>add-source</id>
-                        <phase>generate-sources</phase>
-                        <goals>
-                            <goal>add-source</goal>
-                        </goals>
-                        <configuration>
-                            <sources>
-                                <source>${project.build.directory}/generated-sources/annotations</source>
-                            </sources>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>            -->
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-compiler-plugin</artifactId>
-                <configuration>
-                    <!--<verbose>true</verbose>-->
-                    <!--<maven.compiler.force.javac>true</maven.compiler.force.javac>-->
-
-                    <!--                    <annotationProcessorPaths>
-                        <dependency>
-                            <groupId>com.mastfrog</groupId>
-                            <artifactId>builder-annotation-processors</artifactId>
-                            <version>${project.version}</version>
-                        </dependency>
-                    </annotationProcessorPaths>
-                    <annotationProcessors>com.mastfrog.builder.annotation.processors.BuilderAnnotationProcessor</annotationProcessors>-->
-
-                    <!--<compilerArgument>-proc:none</compilerArgument>-->
-                    <!--<compilerArgument>-Xlint:unchecked</compilerArgument>-->
-
-                    <compilerArgs>
-                        <arg>-Xlint:unchecked</arg>
-                    </compilerArgs>
-                </configuration>
-            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-javadoc-plugin</artifactId>
                 <configuration>
-                    <source>8</source>
+                    <source>${java.source.level}</source>
                     <detectJavaApiLink>false</detectJavaApiLink>
                     <sourcepath>${basedir}/src/main/java:${basedir}/target/generated-sources/annotations</sourcepath>
-<!--                    <sourceFileIncludes>${basedir}/src/main/java/**/*.java</sourceFileIncludes>
-                    <sourceFileIncludes>${basedir}/target/generated-sources/annotations/**/*.java</sourceFileIncludes>-->
                 </configuration>
             </plugin>
-            <!--            <plugin>
-                <groupId>org.bsc.maven</groupId>
-                <artifactId>maven-processor-plugin</artifactId>
-                <version>4.5</version>
-                <executions>
-                    <execution>
-                        <id>process</id>
-                        <goals>
-                            <goal>process</goal>
-                        </goals>
-                        <phase>generate-sources</phase>
-                        <configuration>
-                            <processors>
-                                <processor>com.mastfrog.builder.annotation.processors.BuilderAnnotationProcessor</processor>
-                            </processors>
-                            <defaultOutputDirectory>${project.build.directory}/generated-sources/annotations/</defaultOutputDirectory>
-                        </configuration>
-                    </execution>
-                </executions>
-                <dependencies>
-                    <dependency>
-                        <groupId>com.mastfrog</groupId>
-                        <artifactId>builder-annotation-processors</artifactId>
-                        <version>${project.version}</version>
-                    </dependency>
-                </dependencies>
-            </plugin>-->
         </plugins>
     </build>
 </project>

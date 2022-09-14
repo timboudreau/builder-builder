@@ -24,6 +24,7 @@
 package com.mastfrog.builder.annotation.processors;
 
 import com.mastfrog.builder.annotation.processors.BuilderDescriptors.BuilderDescriptor;
+import static com.mastfrog.builder.annotation.processors.BuilderDescriptors.initDebug;
 import com.mastfrog.java.vogon.ClassBuilder;
 import java.util.Set;
 import javax.lang.model.element.Modifier;
@@ -43,11 +44,11 @@ public class Gen2 {
     }
 
     public ClassBuilder<String> generate() {
-        ClassBuilder<String> cb = ClassBuilder
+        ClassBuilder<String> cb = initDebug(ClassBuilder
                 .forPackage(desc.packageName())
                 .named(desc.targetTypeName + "Builder")
                 .withModifier(Modifier.PUBLIC, Modifier.FINAL)
-                .autoToString();
+                .autoToString());
 
         desc.genericsRequiredFor(desc.fields()).forEach(tp -> {
             String qual = desc.generics.nameWithBound(tp);
