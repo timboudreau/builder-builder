@@ -34,7 +34,7 @@ import com.mastfrog.java.vogon.ClassBuilder.ValueExpressionBuilder;
  */
 public interface IsSetTestGenerator {
 
-    public <X> ValueExpressionBuilder<ValueExpressionBuilder<X>> isSetTest(
+    <X> ValueExpressionBuilder<ValueExpressionBuilder<X>> isSetTest(
             ConditionBuilder<ValueExpressionBuilder<ValueExpressionBuilder<X>>> tern);
 
 }

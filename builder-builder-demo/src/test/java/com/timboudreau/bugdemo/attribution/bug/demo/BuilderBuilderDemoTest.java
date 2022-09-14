@@ -97,7 +97,8 @@ public class BuilderBuilderDemoTest {
         // If we set the Thing field here, we get a builder with a different "buildWith"
         // method
         BuilderBuilderDemoBuilderSansEmmm<AtomicInteger, Instant> b4
-                = b3a.withThing(new ThingBuilder()
+                = b3a.withThing(thingBuilder
+                        -> thingBuilder
                         .withShortValue((short) 30)
                         .withStringValue("thing")
                         .build()

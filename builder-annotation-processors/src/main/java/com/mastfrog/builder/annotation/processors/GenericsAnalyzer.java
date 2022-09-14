@@ -61,7 +61,7 @@ import javax.lang.model.util.AbstractTypeVisitor9;
  */
 final class GenericsAnalyzer {
 
-    private TypeMirror targetType;
+    private final TypeMirror targetType;
     private final ExecutableElement target;
     private final GenericsModel returnTypeModel;
     private final Map<String, GenericsModel> modelForParameter = new LinkedHashMap<>(12);
@@ -88,8 +88,7 @@ final class GenericsAnalyzer {
     }
 
     Set<TypeModel> all() {
-        Set<TypeModel> all = new LinkedHashSet<>();
-        all.addAll(returnTypeModel.all);
+        Set<TypeModel> all = new LinkedHashSet<>(returnTypeModel.all);
         modelForParameter.values().forEach(v -> {
             all.addAll(v.all);
         });
@@ -179,16 +178,6 @@ final class GenericsAnalyzer {
         return sort(result);
     }
 
-    public Set<String> genericNamesRequiredFor(Set<String> names) {
-        Set<String> result = new LinkedHashSet<>();
-        for (String nm : names) {
-            for (TypeModel tm : genericsRequiredFor(nm)) {
-                result.add(tm.toString());
-            }
-        }
-        return result;
-    }
-
     public Set<TypeModel> genericsRequiredFor(String param) {
         GenericsModel m = modelForParameter.get(param);
         if (m == null) {
@@ -240,16 +229,6 @@ final class GenericsAnalyzer {
             Set<TypeModel> result = new LinkedHashSet<>(this.all);
             result.retainAll(other);
             return result;
-        }
-
-        public Set<TypeModel> intersection(GenericsModel other) {
-            Set<TypeModel> result = new LinkedHashSet<>(this.all);
-            result.retainAll(other.all);
-            return result;
-        }
-
-        public boolean contains(TypeModel tm) {
-            return all.contains(tm);
         }
 
         Set<TypeModel> allOfKind(TypeKind k) {

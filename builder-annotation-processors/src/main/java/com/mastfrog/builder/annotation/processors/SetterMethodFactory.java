@@ -26,12 +26,10 @@ package com.mastfrog.builder.annotation.processors;
 import static com.mastfrog.annotation.AnnotationUtils.capitalize;
 import com.mastfrog.builder.annotation.processors.BuilderDescriptors.BuilderDescriptor;
 import com.mastfrog.builder.annotation.processors.BuilderDescriptors.BuilderDescriptor.FieldDescriptor;
+import static com.mastfrog.builder.annotation.processors.Gen2Cartesian.generateBuilderWithMethod;
 import com.mastfrog.builder.annotation.processors.UnsetCheckerFactory.UnsetCheckGenerator;
 import com.mastfrog.builder.annotation.processors.spi.ConstraintGenerator;
 import com.mastfrog.java.vogon.ClassBuilder;
-import com.mastfrog.java.vogon.ClassBuilder.AssignmentBuilder;
-import com.mastfrog.java.vogon.ClassBuilder.ValueExpressionBuilder;
-import static com.mastfrog.java.vogon.ClassBuilder.variable;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -181,9 +179,8 @@ public class SetterMethodFactory<C> {
 
         @Override
         public void generate() {
-            boolean nullable = !field.isPrimitive();
-
-            bldr.method("with" + capitalize(field.fieldName), mb -> {
+            String withMethodName = "with" + capitalize(field.fieldName);
+            bldr.method(withMethodName, mb -> {
                 if (field.canBeVarargs()) {
                     // Compiler requires final if we use @SafeVarargs
                     mb.withModifier(Modifier.FINAL);
@@ -205,6 +202,9 @@ public class SetterMethodFactory<C> {
                             bb.returningThis();
                         });
             });
+
+            generateBuilderWithMethod(desc, field, bldr, withMethodName,
+                    bldr.parameterizedClassName(false));
         }
     }
 }

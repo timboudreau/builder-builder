@@ -36,7 +36,7 @@
             <dependency>
                 <groupId>com.mastfrog</groupId>
                 <artifactId>java-vogon</artifactId>
-                <version>${mastfrog.version}.1</version>
+                <version>${mastfrog.version}.2</version>
             </dependency>
             <dependency>
                 <groupId>com.mastfrog</groupId>

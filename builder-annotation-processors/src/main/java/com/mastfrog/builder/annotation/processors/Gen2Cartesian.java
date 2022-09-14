@@ -44,9 +44,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 import static javax.lang.model.element.Modifier.FINAL;
 import static javax.lang.model.element.Modifier.PUBLIC;
 import static javax.lang.model.element.Modifier.STATIC;
+import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.TypeKind;
 
 /**
@@ -56,7 +58,7 @@ import javax.lang.model.type.TypeKind;
 public class Gen2Cartesian {
 
     private final BuilderDescriptor desc;
-    private Map<String, OneBuilderModel> models = new HashMap<>();
+    private final Map<String, OneBuilderModel> models = new HashMap<>();
 
     Gen2Cartesian(BuilderDescriptor desc) {
         this.desc = desc;
@@ -129,11 +131,10 @@ public class Gen2Cartesian {
 
     private OneBuilderModel forFields(Set<FieldDescriptor> unused, Set<FieldDescriptor> used) {
         String name = oneBuilderName(used, unused);
-        OneBuilderModel m = models.computeIfAbsent(name, nm -> {
+        return models.computeIfAbsent(name, nm -> {
 
             return new OneBuilderModel(unused, used, desc.optionalFields());
         });
-        return m;
     }
 
     private class OneBuilderModel implements Comparable<OneBuilderModel> {
@@ -231,13 +232,15 @@ public class Gen2Cartesian {
 
             if (unusedFields.size() > 1) {
                 for (FieldDescriptor fd : unusedFields) {
-                    result.method("with" + capitalize(fd.fieldName), mb -> {
+                    String withMethodName = "with" + capitalize(fd.fieldName);
+                    OneBuilderModel next = forFields(omitting(fd, unusedFields), including(fd, usedFields));
+                    result.method(withMethodName, mb -> {
                         if (fd.canBeVarargs()) {
                             mb.withModifier(FINAL)
                                     .annotatedWith("SafeVarargs").closeAnnotation();
                         }
                         mb.addArgument(fd.parameterTypeName(), fd.fieldName);
-                        OneBuilderModel next = forFields(omitting(fd, unusedFields), including(fd, usedFields));
+
                         mb.returning(next.nameWithImplicitGenerics());
                         mb.withModifier(PUBLIC);
                         mb.docComment(fd.setterJavadoc());
@@ -253,6 +256,8 @@ public class Gen2Cartesian {
                             });
                         });
                     });
+
+                    generateBuilderWithMethod(desc, fd, result, withMethodName, next);
                 }
             } else if (unusedFields.size() == 1) {
                 FieldDescriptor last = unusedFields.iterator().next();
@@ -427,4 +432,49 @@ public class Gen2Cartesian {
             return name.compareToIgnoreCase(o.name);
         }
     }
+
+    public static <C> void generateBuilderWithMethod(BuilderDescriptor desc, FieldDescriptor fd, ClassBuilder<C> result, String withMethodName, OneBuilderModel next) {
+        generateBuilderWithMethod(desc, fd, result, withMethodName, next.nameWithImplicitGenerics());
+    }
+
+    public static <C> void generateBuilderWithMethod(BuilderDescriptor desc,
+            FieldDescriptor fd, ClassBuilder<C> result, String withMethodName,
+            String nextBuilderType) {
+        TypeElement targ = fd.targetTypeElement();
+        // will be null for types like int[] that don't have a type
+        // element
+        if (targ != null && targ.asType().getKind() == TypeKind.DECLARED) {
+            String nm = targ.asType().toString();
+            if (nm.startsWith("java.")) {
+                return;
+            }
+            desc.owner().find(targ).ifPresent(other -> {
+                boolean canBuild = other.isSamePackage(desc)
+                        || !other.styles.contains(BuilderStyles.PACKAGE_PRIVATE);
+                if (canBuild) {
+                    result.method(withMethodName, mb -> {
+                        result.importing(Function.class);
+                        mb.withModifier(PUBLIC)
+                                .docComment("Populate the " + fd.fieldName + " using a builder."
+                                        + "\n@param builderHandler a function which "
+                                        + "takes the passed builder and returns a result from it."
+                                        + "\n@return a builder")
+                                .returning(nextBuilderType)
+                                .addArgument("Function<" + other.builderName
+                                        + ", " + fd.typeName() + ">", "builderHandler")
+                                .body(bb -> {
+                                    bb.returningInvocationOf(withMethodName)
+                                            .withArgumentFromInvoking("apply")
+                                            .withArgumentFromNew(nb -> {
+                                                nb.ofType(other.builderName);
+                                            }).on("builderHandler")
+                                            .onThis();
+                                });
+                    });
+
+                }
+            });
+        }
+    }
+
 }

@@ -406,7 +406,7 @@ public class UnsetCheckerFactory<C> {
         }
 
         private String cast() {
-            return "(" + toString() + ") ";
+            return "(" + this + ") ";
         }
 
         public String toExpression(Number n) {

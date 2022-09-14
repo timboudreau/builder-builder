@@ -28,11 +28,8 @@ import com.mastfrog.builder.annotation.processors.BuilderDescriptors.BuilderDesc
 import com.mastfrog.builder.annotation.processors.LocalFieldFactory.LocalFieldGenerator;
 import com.mastfrog.builder.annotation.processors.spi.ConstraintGenerator;
 import com.mastfrog.java.vogon.ClassBuilder;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Set;
-import java.util.TreeSet;
+
+import java.util.*;
 import java.util.function.Function;
 import javax.lang.model.element.Modifier;
 import javax.lang.model.type.TypeMirror;
@@ -73,9 +70,7 @@ public class BuildMethodFactory<C> {
             }
         }
         List<FieldDescriptor> fds = new ArrayList<>(descsWithConstraints);
-        Collections.sort(fds, (a, b) -> {
-            return Integer.compare(a.constraintWeightSum(), b.constraintWeightSum());
-        });
+        Collections.sort(fds, Comparator.comparingInt(FieldDescriptor::constraintWeightSum));
         return fds;
     }
 
@@ -219,7 +214,7 @@ public class BuildMethodFactory<C> {
                 cg.decorateClass(bldr.topLevel());
                 iff.lineComment("Weight " + cg.weight() + " " + cg.getClass().getSimpleName());
                 cg.generate(localFieldName, problemsList, "add", desc.utils(), if2, fd.fieldName);
-            };
+            }
             if2.endIf();
         }
     }

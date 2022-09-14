@@ -47,6 +47,7 @@ public class Gen2 {
         ClassBuilder<String> cb = initDebug(ClassBuilder
                 .forPackage(desc.packageName())
                 .named(desc.targetTypeName + "Builder")
+                .docComment("Builder for a " + desc.targetTypeName)
                 .withModifier(Modifier.PUBLIC, Modifier.FINAL)
                 .autoToString());
 
@@ -57,7 +58,7 @@ public class Gen2 {
 
 //        cb.generateDebugLogCode();
         LocalFieldFactory<String> lff = new LocalFieldFactory<>(desc, cb);
-        UnsetCheckerFactory<String> usc = new UnsetCheckerFactory<String>(cb, styles, desc, lff::generatorFor);
+        UnsetCheckerFactory<String> usc = new UnsetCheckerFactory<>(cb, styles, desc, lff::generatorFor);
         lff.generate();
 
         ValidationMethodFactory<String> vmf = ValidationMethodFactory.create(cb, desc);
@@ -68,16 +69,6 @@ public class Gen2 {
 
         bmf.flatBuildGenerator().generate();
 
-//        cb.method("build").body(bb -> {
-//            String probs = desc.uniquify("problems");
-//            bb.declare(probs)
-//                    .initializedWithNew(nb -> {
-//                        nb.withArgument(desc.requiredFields().size())
-//                                .ofType("java.util.ArrayList<>");
-//                    })
-//                    .as("java.util.List<String>");
-//            usc.generateAllChecks(bb, probs, "add");
-//        });
-        return cb;
+        return cb.sortMembers();
     }
 }

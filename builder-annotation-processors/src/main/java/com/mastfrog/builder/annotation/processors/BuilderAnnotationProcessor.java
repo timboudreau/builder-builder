@@ -100,6 +100,7 @@ public class BuilderAnnotationProcessor extends AbstractProcessor {
         return result;
     }
 
+    @SuppressWarnings("unused")
     void record(Element el, AnnotationMirror mir) {
         Set<BuilderStyles> styles = BuilderStyles.styles(utils, mir);
         String builderNameFromAnnotation = utils.annotationValue(mir, "className", String.class, null);
@@ -150,7 +151,7 @@ public class BuilderAnnotationProcessor extends AbstractProcessor {
             utils.fail("No element kind (broken source?)", el);
             return false;
         }
-        boolean result = false;
+        boolean result;
         switch (kind) {
             case CONSTRUCTOR:
             case METHOD:
