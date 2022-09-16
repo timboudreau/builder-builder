@@ -27,9 +27,17 @@ import com.mastfrog.annotation.AnnotationUtils;
 import com.mastfrog.builder.annotation.processors.spi.IsSetTestGenerator;
 import com.mastfrog.java.vogon.ClassBuilder;
 import com.mastfrog.java.vogon.ClassBuilder.ValueExpressionBuilder;
+import com.mastfrog.util.strings.Escaper;
+import com.mastfrog.util.strings.Strings;
+import java.util.ArrayList;
+import java.util.List;
 import javax.lang.model.element.AnnotationMirror;
 import javax.lang.model.element.Element;
+import javax.lang.model.element.ElementKind;
+import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.Modifier;
+import javax.lang.model.element.TypeElement;
+import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.ArrayType;
 import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
@@ -85,20 +93,77 @@ public abstract class Defaulter {
         } else if (numericDefault != null) {
             switch (rawType.getKind()) {
                 case DOUBLE:
+                    return new NumberLiteral(numericDefault);
                 case FLOAT:
+                    return new NumberLiteral(numericDefault.floatValue());
                 case BYTE:
+                    return new NumberLiteral(numericDefault.byteValue());
                 case INT:
+                    return new NumberLiteral(numericDefault.intValue());
                 case SHORT:
+                    return new NumberLiteral(numericDefault.shortValue());
                 case LONG:
+                    return new NumberLiteral(numericDefault.longValue());
                 case CHAR:
                     return new NumberGen(numericDefault, rawType.getKind());
                 default:
-                    utils.fail("Cannot use a numeric default " + numericDefault
-                            + " for a variable of type " + type);
+                    switch (rawType.toString()) {
+                        case "java.lang.Long":
+                            return new NumberLiteral(numericDefault.longValue());
+                        case "java.lang.Integer":
+                            return new NumberLiteral(numericDefault.intValue());
+                        case "java.lang.Float":
+                            return new NumberLiteral(numericDefault.floatValue());
+                        case "java.lang.Short":
+                            return new NumberLiteral(numericDefault.shortValue());
+                        case "java.lang.Byte":
+                            return new NumberLiteral(numericDefault.byteValue());
+                        case "java.lang.Double":
+                            return new NumberLiteral(numericDefault);
+                        case "java.lang.Character":
+                            return new NumberGen(numericDefault, rawType.getKind());
+                        default:
+                            TypeElement te = utils.processingEnv().getElementUtils().getTypeElement(rawType.toString());
+                            if (te != null) {
+
+                                ExecutableElement numConstruct
+                                        = findNumericConstructor(te, utils);
+                                if (numConstruct != null) {
+                                    return new NumberConstructorDefaulter(te, convertNumberFor(numConstruct, numericDefault));
+                                }
+
+                                utils.fail("Cannot use a numeric default " + numericDefault
+                                        + " for a variable of type " + type);
+                            }
+                    }
                     break;
             }
         } else if (stringDefault != null) {
-            if (java.lang.CharSequence.class.getName().equals(rawType.toString())
+            if (utils.isAssignable(rawType, Enum.class.getName())) {
+                TypeElement enumType = utils.processingEnv().getElementUtils().getTypeElement(rawType.toString());
+                if (enumType != null) {
+                    boolean found = false;
+                    List<String> names = new ArrayList<>();
+                    for (Element e : enumType.getEnclosedElements()) {
+                        if (e.getKind() == ElementKind.ENUM_CONSTANT) {
+                            String name = e.getSimpleName().toString();
+                            names.add(name);
+                            if (name.equals(stringDefault)) {
+                                found = true;
+                                break;
+                            }
+                            names.add(name);
+                        }
+                    }
+                    if (!found) {
+                        utils.fail("No enum constant named '" + stringDefault + "' in "
+                                + enumType.getSimpleName() + ".  Available constants are "
+                                + Strings.join(", ", names),
+                                el, nullableAnno);
+                    }
+                }
+                return new EnumLiteral(rawType, stringDefault);
+            } else if (java.lang.CharSequence.class.getName().equals(rawType.toString())
                     || utils.isAssignable(rawType, "java.lang.String")) {
                 return new StringLiteral(stringDefault);
             } else if ("char".equals(rawType.toString())
@@ -110,10 +175,142 @@ public abstract class Defaulter {
                     return new CharLiteral(stringDefault.charAt(0));
                 }
             } else {
+                TypeElement te = utils.processingEnv().getElementUtils().getTypeElement(rawType.toString());
+                ExecutableElement stringConstructor = findStringConstructor(te, utils);
+                if (stringConstructor != null) {
+                    return new StringConstructorDefaulter(te, stringDefault);
+                }
+                ExecutableElement factoryMethod = findStringFactoryMethod(te, utils);
+                if (factoryMethod != null) {
+                    return new StringFactoryMethodDefaulter(te,
+                            factoryMethod.getSimpleName().toString(), stringDefault);
+                }
+
                 utils.fail("Cannot use a string default to create a parameter of type " + type);
             }
         }
         return new NoOp();
+    }
+
+    static ExecutableElement findNumericConstructor(TypeElement te, AnnotationUtils utils) {
+        if (te == null) {
+            return null;
+        }
+        ExecutableElement el = findConstructor(te, utils, "double", "java.lang.Double");
+        if (el == null) {
+            el = findConstructor(te, utils, "float", "java.lang.Float");
+        }
+        if (el == null) {
+            el = findConstructor(te, utils, "double", "java.lang.Double");
+        }
+        if (el == null) {
+            el = findConstructor(te, utils, "long", "java.lang.Long");
+        }
+        if (el == null) {
+            el = findConstructor(te, utils, "int", "java.lang.Integer");
+        }
+        if (el == null) {
+            el = findConstructor(te, utils, "short", "java.lang.Short");
+        }
+        if (el == null) {
+            el = findConstructor(te, utils, "byte", "java.lang.Byte");
+        }
+        return el;
+    }
+
+    static Number convertNumberFor(ExecutableElement el, Number orig) {
+        TypeMirror type = el.getParameters().get(0).asType();
+        switch (type.getKind()) {
+            case DOUBLE:
+                return orig.doubleValue();
+            case FLOAT:
+                return orig.floatValue();
+            case LONG:
+                return orig.longValue();
+            case INT:
+                return orig.intValue();
+            case SHORT:
+                return orig.shortValue();
+            case BYTE:
+                return orig.byteValue();
+        }
+        switch (type.toString()) {
+            case "java.lang.Double":
+                return orig.doubleValue();
+            case "java.lang.Float":
+                return orig.floatValue();
+            case "java.lang.Long":
+                return orig.longValue();
+            case "java.lang.Integer":
+                return orig.intValue();
+            case "java.lang.Short":
+                return orig.shortValue();
+            case "java.lang.Byte":
+                return orig.byteValue();
+        }
+
+        return orig;
+    }
+
+    static ExecutableElement findConstructor(TypeElement te, AnnotationUtils utils, String... typeNames) {
+        if (te == null) {
+            return null;
+        }
+        for (Element e : te.getEnclosedElements()) {
+            if (e.getKind() == ElementKind.CONSTRUCTOR) {
+                ExecutableElement ex = (ExecutableElement) e;
+                List<? extends VariableElement> params = ex.getParameters();
+                if (params.size() == 1) {
+                    VariableElement ve = params.get(0);
+                    for (String t : typeNames) {
+                        if (t.equals(ve.asType().toString()) || utils.isAssignable(ve.asType(), t)) {
+                            return ex;
+                        }
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    static ExecutableElement findStringConstructor(TypeElement te, AnnotationUtils utils) {
+        if (te == null) {
+            return null;
+        }
+        for (Element e : te.getEnclosedElements()) {
+            if (e.getKind() == ElementKind.CONSTRUCTOR) {
+                ExecutableElement ex = (ExecutableElement) e;
+                List<? extends VariableElement> params = ex.getParameters();
+                if (params.size() == 1) {
+                    VariableElement ve = params.get(0);
+                    if ("java.lang.String".equals(ve.asType().toString()) || utils.isAssignable(ve.asType(), "java.lang.CharSequence")) {
+                        return ex;
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    static ExecutableElement findStringFactoryMethod(TypeElement te, AnnotationUtils utils) {
+        if (te == null) {
+            return null;
+        }
+        for (Element e : te.getEnclosedElements()) {
+            if (e.getKind() == ElementKind.METHOD) {
+                ExecutableElement ex = (ExecutableElement) e;
+                if (ex.getModifiers().contains(Modifier.STATIC) && te.asType().equals(ex.getReturnType())) {
+                    List<? extends VariableElement> params = ex.getParameters();
+                    if (params.size() == 1) {
+                        VariableElement ve = params.get(0);
+                        if ("java.lang.String".equals(ve.asType().toString()) || utils.isAssignable(ve.asType(), "java.lang.CharSequence")) {
+                            return ex;
+                        }
+                    }
+                }
+            }
+        }
+        return null;
     }
 
     static class NumberGen extends Defaulter {
@@ -431,6 +628,9 @@ public abstract class Defaulter {
 
         @Override
         String defaultExpression() {
+            if (ch == '\'') {
+                return "'\\'\\'";
+            }
             return '\'' + Character.toString(ch) + '\'';
         }
 
@@ -439,5 +639,167 @@ public abstract class Defaulter {
                 ClassBuilder<?> target) {
             return test.isSetTest(veb.ternary()).expression(localName).literal(ch);
         }
+    }
+
+    static class EnumLiteral extends Defaulter {
+
+        private final TypeMirror type;
+        private final String literal;
+
+        public EnumLiteral(TypeMirror type, String literal) {
+            this.type = type;
+            this.literal = literal;
+        }
+
+        @Override
+        String defaultExpression() {
+            return type + "." + literal;
+        }
+
+        public <X> X generate(String localName, IsSetTestGenerator test, ValueExpressionBuilder<X> veb,
+                ClassBuilder<?> target) {
+            return test.isSetTest(veb.ternary()).expression(localName).expression(defaultExpression());
+        }
+    }
+
+    static class StringConstructorDefaulter extends Defaulter {
+
+        private final TypeElement ofType;
+        private final String string;
+
+        public StringConstructorDefaulter(TypeElement ofType, String string) {
+            this.ofType = ofType;
+            this.string = string;
+        }
+
+        @Override
+        String defaultExpression() {
+            return "new " + ofType.getQualifiedName() + "(\""
+                    + Strings.escape(string, JAVA_CODE)
+                    + "\")";
+        }
+
+        @Override
+        public <X> X generate(String localName, IsSetTestGenerator test, ValueExpressionBuilder<X> veb, ClassBuilder<?> target) {
+            return test.isSetTest(veb.ternary()).expression(localName).toNewInstance().withStringLiteral(string).ofType(ofType.getQualifiedName().toString());
+        }
+    }
+
+    static class NumberConstructorDefaulter extends Defaulter {
+
+        private final TypeElement ofType;
+        private final Number num;
+
+        public NumberConstructorDefaulter(TypeElement ofType, Number num) {
+            this.ofType = ofType;
+            this.num = num;
+        }
+
+        private String numString() {
+            if (num instanceof Long) {
+                return num.longValue() + "L";
+            } else if (num instanceof Integer) {
+                return Integer.toString(num.intValue());
+            } else if (num instanceof Double) {
+                return num + "D";
+            } else if (num instanceof Float) {
+                return num + "F";
+            } else if (num instanceof Short) {
+                return "(short) " + num;
+            } else if (num instanceof Byte) {
+                return "(byte) " + num;
+            }
+            return num.toString();
+        }
+
+        @Override
+        String defaultExpression() {
+            return "new " + ofType.getQualifiedName() + "(" + numString() + ")";
+        }
+
+        @Override
+        public <X> X generate(String localName, IsSetTestGenerator test, ValueExpressionBuilder<X> veb, ClassBuilder<?> target) {
+            return test.isSetTest(veb.ternary()).expression(localName).toNewInstance().withArgument(ClassBuilder.number(num)).ofType(ofType.getQualifiedName().toString());
+        }
+    }
+
+    static class StringFactoryMethodDefaulter extends Defaulter {
+
+        private final TypeElement ofType;
+        private final String simpleName;
+        private final String string;
+
+        public StringFactoryMethodDefaulter(TypeElement ofType, String simpleName, String string) {
+            this.ofType = ofType;
+            this.simpleName = simpleName;
+            this.string = string;
+        }
+
+        @Override
+        String defaultExpression() {
+            return ofType.getQualifiedName() + "." + simpleName + "(\""
+                    + Strings.escape(string, JAVA_CODE)
+                    + "\")";
+        }
+
+        @Override
+        public <X> X generate(String localName, IsSetTestGenerator test, ValueExpressionBuilder<X> veb, ClassBuilder<?> target) {
+            target.importing(ofType.getQualifiedName().toString());
+            return test.isSetTest(veb.ternary()).expression(localName).invoke(simpleName)
+                    .withStringLiteral(string).on(ofType.getSimpleName().toString());
+        }
+
+    }
+
+    static Escaper JAVA_CODE = ch -> {
+        switch (ch) {
+            case '\t':
+                return "\\t";
+            case '"':
+                return "\\\"";
+            case '\b':
+                return "\\b";
+            case '\n':
+                return "\\n";
+            case '\r':
+                return "\\r";
+            case '\f':
+                return "\\f";
+            case '\\':
+                return "\\\\";
+            default:
+                return Character.toString(ch);
+        }
+    };
+
+    static class NumberLiteral extends Defaulter {
+
+        private final Number value;
+
+        public NumberLiteral(Number value) {
+            this.value = value;
+        }
+
+        public String defaultExpression() {
+            if (value instanceof Byte) {
+                return "(byte) " + value.byteValue();
+            } else if (value instanceof Double) {
+                return value.doubleValue() + "D";
+            } else if (value instanceof Float) {
+                return value.floatValue() + "F";
+            } else if (value instanceof Short) {
+                return "(short) " + value;
+            } else if (value instanceof Long) {
+                return value + "L";
+            }
+            return value.toString();
+        }
+
+        @Override
+        public <X> X generate(String localName, IsSetTestGenerator test, ValueExpressionBuilder<X> veb,
+                ClassBuilder<?> target) {
+            return test.isSetTest(veb.ternary()).expression(localName).literal(value);
+        }
+
     }
 }

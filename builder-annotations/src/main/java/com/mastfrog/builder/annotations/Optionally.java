@@ -24,8 +24,8 @@
 package com.mastfrog.builder.annotations;
 
 import static java.lang.annotation.ElementType.PARAMETER;
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import java.lang.annotation.Retention;
+import static java.lang.annotation.RetentionPolicy.CLASS;
 import java.lang.annotation.Target;
 
 /**
@@ -47,7 +47,7 @@ import java.lang.annotation.Target;
  *
  * @author Tim Boudreau
  */
-@Retention(RUNTIME)
+@Retention(CLASS)
 @Target(PARAMETER)
 public @interface Optionally {
 
@@ -102,13 +102,25 @@ public @interface Optionally {
      * String defaults can be provided for <code>String</code>,
      * <code>CharSequence</code> and (length 1) <code>char</code> or
      * <code>Character</code> parameters.
+     * <p>
+     * <code>stringDefault</code> may be used with non-String types which either
+     * take an instance of String or CharSequence in a constructor visible to
+     * the calling class, or which contain a static method which takes only a
+     * String or CharSequence and return an instance compatible with the type -
+     * so constructors and factory methods compatible with the type will be
+     * found automatically. In the case that there is
+     * <i>more than one factory method</i> that satisfies that constraint, which
+     * one will be chosen is undefined - in short, don't do that.
+     * </p>
      *
      * @return A string
      */
     String stringDefault() default "";
 
     /**
-     * Number defaults.
+     * Number default - will be converted to the appropriate type. Like
+     * <code>stringDefault</code>, will work with constructors and factory
+     * methods if they are visible and can be found at compile time.
      *
      * @return a double
      */

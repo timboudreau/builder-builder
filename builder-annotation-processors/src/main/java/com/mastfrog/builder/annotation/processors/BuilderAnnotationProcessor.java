@@ -90,13 +90,15 @@ public class BuilderAnnotationProcessor extends AbstractProcessor {
         if (re.processingOver() && re.errorRaised()) {
             return false;
         }
-//        if (re.processingOver()) {
         try {
-            descs.generate();
+            if (!descs.isEmpty()) {
+                descs.generate();
+                // Allow another round to happen:
+                return false;
+            }
         } catch (IOException ex) {
             utils.fail(Strings.toString(ex));
         }
-//        }
         return result;
     }
 

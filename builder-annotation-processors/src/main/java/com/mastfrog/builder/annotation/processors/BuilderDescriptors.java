@@ -86,6 +86,10 @@ final class BuilderDescriptors {
                 builderNameFromAnnotation, codeGenerationVersion)));
     }
 
+    public boolean isEmpty() {
+        return descs.isEmpty();
+    }
+
     public Optional<BuilderDescriptor> find(TypeElement desc) {
         if (desc == null) {
             new Exception("Descriptor is null").printStackTrace();
@@ -479,6 +483,9 @@ final class BuilderDescriptors {
                         case "int":
                             return "Integer";
                         default:
+                            if (tp.startsWith("java.lang.")) {
+                                tp = tp.substring("java.lang.".length());
+                            }
                             return capitalize(tp);
                     }
                 }

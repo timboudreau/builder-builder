@@ -265,7 +265,9 @@ public class Gen2Cartesian {
                 String typeToBuild = desc.targetTypeName;
                 String retGenerics = desc.fullTargetGenerics();
 
-                result.method("buildWith" + capitalize(last.fieldName), mb -> {
+                String buildWithMethod = "buildWith" + capitalize(last.fieldName);
+                boolean hasGenerics = !desc.genericsRequiredFor(desc.fields()).isEmpty();
+                result.method(buildWithMethod, mb -> {
                     mb.addArgument(last.parameterTypeName(), last.fieldName);
                     mb.withModifier(PUBLIC);
                     mb.docComment(last.setterJavadoc());
@@ -285,6 +287,7 @@ public class Gen2Cartesian {
                         }
                         mb.throwing(thrown.toString());
                     });
+
                     mb.body(bb -> {
                         bb.lineComment("a. TargetType " + desc.targetTypeName);
                         bb.lineComment("a. TargetFqn " + desc.targetFqn());
@@ -306,11 +309,12 @@ public class Gen2Cartesian {
                                     generateInlineConstraintsTest(result, ucf, nb, fd, def, vmf);
                                 }
                             }
-                            boolean hasGenerics = !desc.genericsRequiredFor(desc.fields()).isEmpty();
+
                             nb.ofType(desc.targetTypeName + (hasGenerics ? "<>" : ""));
                         });
                     });
                 });
+                generateBuilderWithMethod(desc, last, result, buildWithMethod, typeToBuild + retGenerics);
             }
             result.build();
             return result;
@@ -454,6 +458,13 @@ public class Gen2Cartesian {
                 if (canBuild) {
                     result.method(withMethodName, mb -> {
                         result.importing(Function.class);
+                        desc.thrownTypes().forEach(thrown -> {
+                            if (thrown.getKind() != TypeKind.DECLARED) {
+                                desc.utils().fail("Cannot handle generified thrown types", desc.origin);
+                            }
+                            mb.throwing(thrown.toString());
+                        });
+
                         mb.withModifier(PUBLIC)
                                 .docComment("Populate the " + fd.fieldName + " using a builder."
                                         + "\n@param builderHandler a function which "

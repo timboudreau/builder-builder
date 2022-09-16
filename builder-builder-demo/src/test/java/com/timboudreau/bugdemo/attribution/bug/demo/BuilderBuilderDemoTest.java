@@ -52,11 +52,11 @@ public class BuilderBuilderDemoTest {
                                 new StringBuilder("baz"))) // and here we acquire that the list type is StringBuilder
                         // build methods take the last remaining required
                         // parameter, and are named accordingly:
-                        .buildWithThing(
+                        .buildWithThing(thingBuilder ->
                                 // ThingBuilder uses the FLAT generation style,
                                 // meaning you get a build method that throws if
                                 // a parameter is missing
-                                new ThingBuilder()
+                                thingBuilder
                                         .withShortValue((short) 30) // must be > 23
                                         .withStringValue("thing") // must be [a-z]+ 1-20 chars
                                         .build()
