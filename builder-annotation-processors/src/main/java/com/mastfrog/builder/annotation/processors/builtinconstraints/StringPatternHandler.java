@@ -61,12 +61,14 @@ public class StringPatternHandler implements ConstraintHandler {
         private final int maxLength;
         private final String varName;
         private final boolean nullable;
+        private final boolean isSupplier;
 
         StringPatternConstraintGenerator(AnnotationUtils utils, VariableElement ve, AnnotationMirror mir, boolean nullable) {
             this.varName = ve.getSimpleName().toString();
             String pat = utils.annotationValue(mir, "value", String.class, ".*");
             minLength = utils.annotationValue(mir, "minLength", Integer.class, 0);
             maxLength = utils.annotationValue(mir, "maxLength", Integer.class, 0);
+            isSupplier = BigMinMaxHandler.isSupplierOf(utils, ve, String.class);
             if (pat != null && !".*".equals(pat) && !pat.isEmpty()) {
                 Pattern p = null;
                 try {
@@ -134,25 +136,10 @@ public class StringPatternHandler implements ConstraintHandler {
             }
         }
 
-        private String doubleBackslashes(String s) {
-            if (s.indexOf('\\') < 0) {
-                return s;
-            }
-            StringBuilder sb = new StringBuilder();
-            for (int i = 0; i < s.length(); i++) {
-                char c = s.charAt(i);
-                if (c == '\\') {
-                    sb.append(c);
-                }
-                sb.append(c);
-            }
-            return sb.toString();
-        }
-
         @Override
         public void contributeDocComments(Consumer<String> bulletPoints) {
             if (pattern != null) {
-                bulletPoints.accept("Must match the pattern <code>/" + doubleBackslashes(pattern.pattern()) + "/</code>");
+                bulletPoints.accept("Must match the pattern <code>/" + pattern.pattern() + "/</code>");
             }
             if (minLength != 0) {
                 bulletPoints.accept("Must be &gt;= " + minLength + " in length.");
@@ -179,51 +166,107 @@ public class StringPatternHandler implements ConstraintHandler {
                 String fieldVariableName, String problemsListVariableName, String addMethodName, AnnotationUtils utils, B bb, String parameterName) {
             bb.lineComment(getClass().getName());
             if (minLength != 0) {
-                applyNullCheck(fieldVariableName, bb.iff())
-                        .invoke("length").on(fieldVariableName)
-                        .isLessThan(minLength)
-                        .invoke(addMethodName)
-                        .withStringConcatentationArgument(parameterName)
-                        .append(" must be at least ")
-                        .append(minLength)
-                        .append(" characters, but is ")
-                        .appendExpression(fieldVariableName + ".length()")
-                        .append(": '").appendExpression(fieldVariableName).append('\'')
-                        .endConcatenation().on(problemsListVariableName).endIf();
+                if (isSupplier) {
+                    applyNullCheck(fieldVariableName, bb.iff())
+                            .invocationOf("length")
+                            .onInvocationOf("get")
+                            .on(fieldVariableName)
+                            .isLessThan(minLength)
+                            .invoke(addMethodName)
+                            .withStringConcatentationArgument(parameterName)
+                            .append(" must be at least ")
+                            .append(minLength)
+                            .append(" characters, but is ")
+                            .appendExpression(fieldVariableName + ".length()")
+                            .append(": '").appendExpression(fieldVariableName).append('\'')
+                            .endConcatenation().on(problemsListVariableName).endIf();
+
+                } else {
+                    applyNullCheck(fieldVariableName, bb.iff())
+                            .invocationOf("length").on(fieldVariableName)
+                            .isLessThan(minLength)
+                            .invoke(addMethodName)
+                            .withStringConcatentationArgument(parameterName)
+                            .append(" must be at least ")
+                            .append(minLength)
+                            .append(" characters, but is ")
+                            .appendExpression(fieldVariableName + ".length()")
+                            .append(": '").appendExpression(fieldVariableName).append('\'')
+                            .endConcatenation().on(problemsListVariableName).endIf();
+                }
             }
             if (maxLength != Integer.MAX_VALUE) {
-                applyNullCheck(fieldVariableName, bb.iff())
-                        .invoke("length").on(fieldVariableName)
-                        .isGreaterThan(maxLength)
-                        .invoke(addMethodName)
-                        .withStringConcatentationArgument(parameterName)
-                        .append(" must no longer than ")
-                        .append(maxLength)
-                        .append(" characters, but is ")
-                        .appendExpression(fieldVariableName + ".length()")
-                        .append(": '").appendExpression(fieldVariableName).append('\'')
-                        .endConcatenation().on(problemsListVariableName).endIf();
+                if (isSupplier) {
+                    applyNullCheck(fieldVariableName, bb.iff())
+                            .invocationOf("length")
+                            .onInvocationOf("get")
+                            .on(fieldVariableName)
+                            .isGreaterThan(maxLength)
+                            .invoke(addMethodName)
+                            .withStringConcatentationArgument(parameterName)
+                            .append(" must no longer than ")
+                            .append(maxLength)
+                            .append(" characters, but is ")
+                            .appendExpression(fieldVariableName + ".length()")
+                            .append(": '").appendExpression(fieldVariableName).append('\'')
+                            .endConcatenation().on(problemsListVariableName).endIf();
+
+                } else {
+                    applyNullCheck(fieldVariableName, bb.iff())
+                            .invocationOf("length").on(fieldVariableName)
+                            .isGreaterThan(maxLength)
+                            .invoke(addMethodName)
+                            .withStringConcatentationArgument(parameterName)
+                            .append(" must no longer than ")
+                            .append(maxLength)
+                            .append(" characters, but is ")
+                            .appendExpression(fieldVariableName + ".length()")
+                            .append(": '").appendExpression(fieldVariableName).append('\'')
+                            .endConcatenation().on(problemsListVariableName).endIf();
+                }
             }
             if (pattern != null) {
-                applyNullCheck(fieldVariableName, bb.iff())
-                        .invoke("find")
-                        .onInvocationOf("matcher")
-                        .withArgument(fieldVariableName)
-                        .on(patternVarName())
-                        .eqaullingExpression("false")
-                        //                        .endCondition()
-                        .invoke(addMethodName)
-                        .withStringConcatentationArgument("Value of ")
-                        .append(parameterName)
-                        .append(" '")
-                        .appendExpression(fieldVariableName)
-                        .append("' does not match the pattern /")
-                        .append(doubleBackslashes(pattern.pattern()))
-                        .append('/')
-                        .append(": '").appendExpression(fieldVariableName).append('\'')
-                        .endConcatenation()
-                        .on(problemsListVariableName)
-                        .endIf();
+                if (isSupplier) {
+                    applyNullCheck(fieldVariableName, bb.iff())
+                            .invocationOf("find")
+                            .onInvocationOf("matcher")
+                            .withArgumentFromInvoking("get")
+                            .on(fieldVariableName)
+                            .on(patternVarName())
+                            .eqaullingExpression("false")
+                            .invoke(addMethodName)
+                            .withStringConcatentationArgument("Value of ")
+                            .append(parameterName)
+                            .append(" '")
+                            .appendExpression(fieldVariableName)
+                            .append("' does not match the pattern /")
+                            .append(pattern.pattern())
+                            .append('/')
+                            .append(": '").appendExpression(fieldVariableName).append('\'')
+                            .endConcatenation()
+                            .on(problemsListVariableName)
+                            .endIf();
+
+                } else {
+                    applyNullCheck(fieldVariableName, bb.iff())
+                            .invocationOf("find")
+                            .onInvocationOf("matcher")
+                            .withArgument(fieldVariableName)
+                            .on(patternVarName())
+                            .eqaullingExpression("false")
+                            .invoke(addMethodName)
+                            .withStringConcatentationArgument("Value of ")
+                            .append(parameterName)
+                            .append(" '")
+                            .appendExpression(fieldVariableName)
+                            .append("' does not match the pattern /")
+                            .append(pattern.pattern())
+                            .append('/')
+                            .append(": '").appendExpression(fieldVariableName).append('\'')
+                            .endConcatenation()
+                            .on(problemsListVariableName)
+                            .endIf();
+                }
             }
         }
     }

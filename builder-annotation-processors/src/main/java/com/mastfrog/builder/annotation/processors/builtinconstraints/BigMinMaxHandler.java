@@ -116,7 +116,7 @@ public final class BigMinMaxHandler implements ConstraintHandler {
         return isSupplierOf(utils, parameterElement, BigInteger.class);
     }
 
-    private static boolean isSupplierOf(AnnotationUtils utils, VariableElement parameterElement, Class<?> what) {
+    static boolean isSupplierOf(AnnotationUtils utils, VariableElement parameterElement, Class<?> what) {
         Elements elu = utils.processingEnv().getElementUtils();
         TypeElement suppType = elu.getTypeElement(Supplier.class.getName());
         TypeElement bdType = elu.getTypeElement(what.getName());
@@ -158,6 +158,18 @@ public final class BigMinMaxHandler implements ConstraintHandler {
                 String fieldVariableName, String problemsListVariableName, String addMethodName,
                 AnnotationUtils utils, B bb, String parameterName) {
             bb.lineComment(getClass().getName());
+            if (nullable) {
+                IfBuilder<B> test = bb.ifNotNull(fieldVariableName);
+                doGenerate(fieldVariableName, problemsListVariableName, addMethodName, utils, test, parameterName);
+                test.endIf();
+            } else {
+                doGenerate(fieldVariableName, problemsListVariableName, addMethodName, utils, bb, parameterName);
+            }
+        }
+
+        private <T, B extends BlockBuilderBase<T, B, X>, X> void doGenerate(
+                String fieldVariableName, String problemsListVariableName, String addMethodName,
+                AnnotationUtils utils, B bb, String parameterName) {
             String stringLit = utils.annotationValue(min, "value", String.class);
             Value v;
             if (isSupplier) {
@@ -176,12 +188,6 @@ public final class BigMinMaxHandler implements ConstraintHandler {
                             nb.withStringLiteral(stringLit)
                                     .ofType(typeName);
                         }).isGreaterThan(number(0));
-            }
-            if (nullable) {
-                v = ClassBuilder.invocationOf("_isSet")
-                        .withArgument(fieldVariableName)
-                        .on("this")
-                        .logicalAndWith(v);
             }
 
             bb.iff(v)
@@ -229,6 +235,19 @@ public final class BigMinMaxHandler implements ConstraintHandler {
                 String fieldVariableName, String problemsListVariableName, String addMethodName,
                 AnnotationUtils utils, B bb, String parameterName) {
             bb.lineComment(getClass().getName());
+            if (nullable) {
+                IfBuilder<B> test = bb.ifNotNull(fieldVariableName);
+                doGenerate(fieldVariableName, problemsListVariableName, addMethodName, utils, test, parameterName);
+                test.endIf();
+            } else {
+                doGenerate(fieldVariableName, problemsListVariableName, addMethodName, utils, bb, parameterName);
+            }
+        }
+
+        private <T, B extends BlockBuilderBase<T, B, X>, X> void doGenerate(
+                String fieldVariableName, String problemsListVariableName, String addMethodName,
+                AnnotationUtils utils, B bb, String parameterName) {
+
             String stringLit = utils.annotationValue(min, "value", String.class);
             Value v;
             if (isSupplier) {
@@ -247,12 +266,6 @@ public final class BigMinMaxHandler implements ConstraintHandler {
                             nb.withStringLiteral(stringLit)
                                     .ofType(typeName);
                         }).isLessThan(number(0));
-            }
-            if (nullable) {
-                v = ClassBuilder.invocationOf("_isSet")
-                        .withArgument(fieldVariableName)
-                        .on("this")
-                        .logicalAndWith(v);
             }
 
             bb.iff(v)

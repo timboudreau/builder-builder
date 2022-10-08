@@ -31,6 +31,7 @@ import com.mastfrog.java.vogon.ClassBuilder;
 import java.util.function.Consumer;
 import javax.lang.model.element.AnnotationMirror;
 import javax.lang.model.element.Element;
+import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.ArrayType;
 import javax.lang.model.type.TypeKind;
@@ -71,17 +72,21 @@ public class CollectionAndArraySizeHandler implements ConstraintHandler {
         if (checkedAs != null) {
             checkedAs = utils.erasureOf(checkedAs);
         }
-        if (utils.isAssignable(type, "java.util.Map")) {
+//        if (utils.isAssignable(type, "java.util.Map")) {
+        if (isAssignable(utils, "java.util.Map", parameterElement)) {
             if (noNulls) {
                 utils.fail("Cannot null check a map's elements", parameterElement, mir);
                 return;
             }
             genConsumer.accept(new CollectionConstraintGenerator(min, max, false, nullable, false, checkedAs));
-        } else if (utils.isAssignable(type, "java.util.List")) {
+//        } else if (utils.isAssignable(type, "java.util.List")) {
+        } else if (isAssignable(utils, "java.util.List", parameterElement)) {
             genConsumer.accept(new CollectionConstraintGenerator(min, max, noNulls, nullable, true, checkedAs));
-        } else if (utils.isAssignable(type, "java.util.Collection")) {
+//        } else if (utils.isAssignable(type, "java.util.Collection")) {
+        } else if (isAssignable(utils, "java.util.Collection", parameterElement)) {
             genConsumer.accept(new CollectionConstraintGenerator(min, max, noNulls, nullable, false, checkedAs));
-        } else if (utils.isAssignable(type, "java.util.Map")) {
+//        } else if (utils.isAssignable(type, "java.util.Map")) {
+        } else if (isAssignable(utils, "java.util.Map", parameterElement)) {
             genConsumer.accept(new CollectionConstraintGenerator(min, max, noNulls, nullable, false, checkedAs));
         } else if (type.getKind() == TypeKind.ARRAY) {
             ArrayType at = (ArrayType) type;
@@ -90,6 +95,58 @@ public class CollectionAndArraySizeHandler implements ConstraintHandler {
         } else {
             utils.fail("Cannot apply collection constraint to a " + type);
         }
+    }
+
+    private static boolean isAssignable(AnnotationUtils utils, String typeName, VariableElement param) {
+        // Hacky but will do for now
+        TypeElement el = utils.processingEnv().getElementUtils().getTypeElement(typeName);
+
+        boolean assig1 = utils.processingEnv().getTypeUtils().isAssignable(el.asType(), param.asType());
+        boolean assig2 = utils.processingEnv().getTypeUtils().isAssignable(param.asType(), el.asType());
+
+        if (!assig1 && !assig2) {
+            TypeElement pt = utils.processingEnv().getElementUtils().getTypeElement(param.asType().toString());
+            while (pt != null && !pt.asType().toString().equals("java.lang.Object")) {
+
+                for (TypeMirror iface : pt.getInterfaces()) {
+                    if (el.asType().equals(iface)) {
+                        return true;
+                    }
+                    TypeMirror eras = utils.processingEnv().getTypeUtils().erasure(iface);
+                    if (eras.equals(el.asType())) {
+                        return true;
+                    }
+                    eras = utils.erasureOf(iface);
+                    if (eras.equals(el.asType())) {
+                        return true;
+                    }
+                }
+
+                if (pt.getInterfaces().contains(el.asType())) {
+                    return true;
+                }
+
+                TypeMirror mir = pt.getSuperclass();
+                if (mir == null) {
+                    break;
+                }
+                mir = utils.erasureOf(mir);
+                assig1 = utils.processingEnv().getTypeUtils().isAssignable(el.asType(), mir);
+                assig2 = utils.processingEnv().getTypeUtils().isAssignable(mir, el.asType());
+                if (assig1 || assig2) {
+                    return true;
+                }
+                pt = utils.processingEnv().getElementUtils().getTypeElement(mir.toString());
+                if (pt == null) {
+                    break;
+                }
+                if (pt.getInterfaces().contains(el.asType())) {
+                    return true;
+                }
+            }
+        }
+
+        return assig1 || assig2;
     }
 
     private static abstract class AbstractGenerator implements ConstraintGenerator {
