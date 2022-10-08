@@ -39,10 +39,15 @@ import com.mastfrog.util.service.ServiceProvider;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 import javax.lang.model.element.AnnotationMirror;
 import javax.lang.model.element.Element;
+import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
+import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeMirror;
+import javax.lang.model.util.Elements;
+import javax.lang.model.util.Types;
 
 /**
  *
@@ -65,19 +70,67 @@ public final class BigMinMaxHandler implements ConstraintHandler {
             TypeMirror paramType = parameterElement.asType();
             boolean isBigInteger = utils.isAssignable(paramType, BigInteger.class.getName());
             boolean isBigDecimal = utils.isAssignable(paramType, BigDecimal.class.getName());
+            boolean isSupplier = false;
+            if (!isBigInteger && !isBigDecimal) {
+                if (isBigDecimalSupplier(utils, parameterElement)) {
+                    isBigDecimal = true;
+                    isSupplier = true;
+                } else if (isBigIntegerSupplier(utils, parameterElement)) {
+                    isBigInteger = true;
+                    isSupplier = true;
+                }
+            }
             if (!isBigInteger && !isBigDecimal) {
                 utils.fail("Cannot apply BigMin or BigMax to a " + paramType,
                         parameterElement, (min == null ? min : max));
                 return;
             }
+            String type = isBigDecimal ? "BigDecimal" : "BigInteger";
             if (min != null) {
-                genConsumer.accept(new BigMinGenerator(utils, min, nullable, isBigInteger ? "BigInteger" : "BigDecimal"));
+                genConsumer.accept(new BigMinGenerator(utils, min, nullable, type, isSupplier));
             }
             if (max != null) {
-                genConsumer.accept(new BigMaxGenerator(utils, max, nullable, isBigInteger ? "BigInteger" : "BigDecimal"));
+                genConsumer.accept(new BigMaxGenerator(utils, max, nullable, type, isSupplier));
             }
         }
+    }
 
+    private static TypeMirror supplierType(AnnotationUtils utils, VariableElement parameterElement) {
+        System.out.println("CHECK SUPP " + parameterElement.asType());
+        System.out.println("ERAS " + utils.erasureOf(parameterElement.asType()));
+
+        boolean isSupplier = utils.isAssignable(utils.erasureOf(parameterElement.asType()), Supplier.class.getName());
+        if (!isSupplier) {
+            System.out.println("  NOT SUPPLIER " + parameterElement.asType());
+            return null;
+        }
+        System.out.println("IS SUPP " + parameterElement.asType());
+        TypeElement el = utils.typeElementOfField(parameterElement);
+        System.out.println("TE OF FIELD " + el);
+        if (el == null) {
+            return null;
+        }
+        TypeMirror param = utils.getTypeParameter(0, el);
+        System.out.println("  TYPE PARAM " + param);
+        return param;
+    }
+
+    private static boolean isBigDecimalSupplier(AnnotationUtils utils, VariableElement parameterElement) {
+        return isSupplierOf(utils, parameterElement, BigDecimal.class);
+    }
+
+    private static boolean isBigIntegerSupplier(AnnotationUtils utils, VariableElement parameterElement) {
+        return isSupplierOf(utils, parameterElement, BigInteger.class);
+    }
+
+    private static boolean isSupplierOf(AnnotationUtils utils, VariableElement parameterElement, Class<?> what) {
+        Elements elu = utils.processingEnv().getElementUtils();
+        TypeElement suppType = elu.getTypeElement(Supplier.class.getName());
+        TypeElement bdType = elu.getTypeElement(what.getName());
+
+        Types tu = utils.processingEnv().getTypeUtils();
+        DeclaredType theType = tu.getDeclaredType(suppType, bdType.asType());
+        return tu.isAssignable(parameterElement.asType(), theType);
     }
 
     private static class BigMinGenerator implements ConstraintGenerator {
@@ -86,13 +139,15 @@ public final class BigMinMaxHandler implements ConstraintHandler {
         private final AnnotationMirror min;
         private final boolean nullable;
         private final String typeName;
+        private final boolean isSupplier;
 
         private BigMinGenerator(AnnotationUtils utils, AnnotationMirror min, boolean nullable,
-                String typeName) {
+                String typeName, boolean isSupplier) {
             this.utils = utils;
             this.min = min;
             this.nullable = nullable;
             this.typeName = typeName;
+            this.isSupplier = isSupplier;
         }
 
         @Override
@@ -111,13 +166,24 @@ public final class BigMinMaxHandler implements ConstraintHandler {
                 AnnotationUtils utils, B bb, String parameterName) {
             bb.lineComment(getClass().getName());
             String stringLit = utils.annotationValue(min, "value", String.class);
-            Value v = ClassBuilder.invocationOf("compareTo")
-                    .withArgument(fieldVariableName)
-                    .onNew(nb -> {
-                        nb.withStringLiteral(stringLit)
-                                .ofType(typeName);
-                    }).isGreaterThan(number(0));
+            Value v;
+            if (isSupplier) {
+                v = ClassBuilder.invocationOf("compareTo")
+                        .withArgumentFromInvoking("get")
+                        .on(fieldVariableName)
+                        .onNew(nb -> {
+                            nb.withStringLiteral(stringLit)
+                                    .ofType(typeName);
+                        }).isGreaterThan(number(0));
 
+            } else {
+                v = ClassBuilder.invocationOf("compareTo")
+                        .withArgument(fieldVariableName)
+                        .onNew(nb -> {
+                            nb.withStringLiteral(stringLit)
+                                    .ofType(typeName);
+                        }).isGreaterThan(number(0));
+            }
             if (nullable) {
                 v = ClassBuilder.invocationOf("_isSet")
                         .withArgument(fieldVariableName)
@@ -144,13 +210,15 @@ public final class BigMinMaxHandler implements ConstraintHandler {
         private final AnnotationMirror min;
         private final boolean nullable;
         private final String typeName;
+        private final boolean isSupplier;
 
         private BigMaxGenerator(AnnotationUtils utils, AnnotationMirror min, boolean nullable,
-                String typeName) {
+                String typeName, boolean isSupplier) {
             this.utils = utils;
             this.min = min;
             this.nullable = nullable;
             this.typeName = typeName;
+            this.isSupplier = isSupplier;
         }
 
         @Override
@@ -169,13 +237,24 @@ public final class BigMinMaxHandler implements ConstraintHandler {
                 AnnotationUtils utils, B bb, String parameterName) {
             bb.lineComment(getClass().getName());
             String stringLit = utils.annotationValue(min, "value", String.class);
-            Value v = ClassBuilder.invocationOf("compareTo")
-                    .withArgument(fieldVariableName)
-                    .onNew(nb -> {
-                        nb.withStringLiteral(stringLit)
-                                .ofType(typeName);
-                    }).isLessThan(number(0));
+            Value v;
+            if (isSupplier) {
+                v = ClassBuilder.invocationOf("compareTo")
+                        .withArgumentFromInvoking("get")
+                        .on(fieldVariableName)
+                        .onNew(nb -> {
+                            nb.withStringLiteral(stringLit)
+                                    .ofType(typeName);
+                        }).isLessThan(number(0));
 
+            } else {
+                v = ClassBuilder.invocationOf("compareTo")
+                        .withArgument(fieldVariableName)
+                        .onNew(nb -> {
+                            nb.withStringLiteral(stringLit)
+                                    .ofType(typeName);
+                        }).isLessThan(number(0));
+            }
             if (nullable) {
                 v = ClassBuilder.invocationOf("_isSet")
                         .withArgument(fieldVariableName)

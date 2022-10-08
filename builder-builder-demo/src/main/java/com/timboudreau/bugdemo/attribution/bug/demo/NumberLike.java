@@ -33,6 +33,7 @@ import com.mastfrog.builder.annotations.constraint.LongMax;
 import com.mastfrog.builder.annotations.constraint.LongMin;
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.util.function.Supplier;
 
 /**
  *
@@ -46,9 +47,39 @@ public final class NumberLike {
             @BigMin("200") @BigMax("2327") BigInteger bigInt,
             @LongMin(22) @LongMax(122) NumThingOne numOne,
             @DoubleMin(22.1) @DoubleMax(122.325) NumThingOne numTwo,
-            @Optionally @DoubleMin(1) @DoubleMax(5) Double nullableDouble
+            @Optionally @DoubleMin(1) @DoubleMax(5) Double nullableDouble,
+            @BigMin("1000") @BigMax("2000") Bis bis,
+            @BigMin("20000") @BigMax("200000") Bds bds
     ) {
 
+    }
+
+    public static class Bis implements Supplier<BigInteger> {
+
+        private final BigInteger bi;
+
+        Bis(BigInteger bi) {
+            this.bi = bi;
+        }
+
+        @Override
+        public BigInteger get() {
+            return bi;
+        }
+    }
+
+    public static class Bds implements Supplier<BigDecimal> {
+
+        private final BigDecimal bd;
+
+        Bds(BigDecimal bi) {
+            this.bd = bi;
+        }
+
+        @Override
+        public BigDecimal get() {
+            return bd;
+        }
     }
 
     public static class NumThingOne extends Number {
