@@ -25,8 +25,11 @@ package com.mastfrog.builder.annotation.processors.builtinconstraints;
 
 import com.mastfrog.annotation.AnnotationUtils;
 import com.mastfrog.builder.annotation.processors.spi.ConstraintGenerator;
+import static com.mastfrog.builder.annotation.processors.spi.ConstraintGenerator.NULLABLE_ANNOTATION;
 import com.mastfrog.builder.annotation.processors.spi.ConstraintHandler;
 import com.mastfrog.java.vogon.ClassBuilder;
+import com.mastfrog.java.vogon.ClassBuilder.ComparisonBuilder;
+import com.mastfrog.java.vogon.ClassBuilder.IfBuilder;
 import com.mastfrog.util.service.ServiceProvider;
 import java.util.function.Consumer;
 import javax.lang.model.element.AnnotationMirror;
@@ -49,20 +52,28 @@ public class FloatMinMaxHandler implements ConstraintHandler {
             Consumer<ConstraintGenerator> genConsumer) {
         AnnotationMirror min = utils.findAnnotationMirror(parameterElement, FLOAT_MIN);
         AnnotationMirror max = utils.findAnnotationMirror(parameterElement, FLOAT_MAX);
+        boolean nullable = utils.findAnnotationMirror(parameterElement, NULLABLE_ANNOTATION) != null;
+
         if (min != null || max != null) {
             TypeMirror paramType = parameterElement.asType();
-            if (!utils.isAssignable(paramType, Float.class.getName())
-                    && !utils.isAssignable(paramType, float.class.getName())) {
+
+            boolean isBoxedDouble = utils.isAssignable(paramType, Double.class.getName());
+            boolean isPrimitiveDouble = !isBoxedDouble && utils.isAssignable(paramType, double.class.getName());
+            boolean isNumber
+                    = !isBoxedDouble && !isPrimitiveDouble
+                    && utils.isAssignable(paramType, Number.class.getName());
+
+            if (!isBoxedDouble && !isPrimitiveDouble && !isNumber) {
                 utils.fail("Cannot apply FloatMin or FloatMax to a " + paramType,
                         parameterElement, (min == null ? min : max));
                 return;
             }
-        }
-        if (min != null) {
-            genConsumer.accept(new FloatMinGenerator(utils, min));
-        }
-        if (max != null) {
-            genConsumer.accept(new FloatMaxGenerator(utils, max));
+            if (min != null) {
+                genConsumer.accept(new FloatMinGenerator(utils, min, isNumber, nullable));
+            }
+            if (max != null) {
+                genConsumer.accept(new FloatMaxGenerator(utils, max, isNumber, nullable));
+            }
         }
     }
 
@@ -77,16 +88,43 @@ public class FloatMinMaxHandler implements ConstraintHandler {
     private static class FloatMaxGenerator implements ConstraintGenerator {
 
         private final float max;
+        private final boolean nullable;
+        private final boolean isNumber;
 
-        FloatMaxGenerator(AnnotationUtils utils, AnnotationMirror max) {
+        FloatMaxGenerator(AnnotationUtils utils, AnnotationMirror max, boolean isNumber, boolean nullable) {
             this.max = utils.annotationValue(max, "value", Float.class, Float.MAX_VALUE);
+            this.isNumber = isNumber;
+            this.nullable = nullable;
         }
 
         @Override
         public <T, B extends ClassBuilder.BlockBuilderBase<T, B, X>, X>
-                void generate(String fieldVariableName, String problemsListVariableName, String addMethodName, AnnotationUtils utils, B bb, String parameterName) {
+                void generate(String fieldVariableName, String problemsListVariableName, String addMethodName,
+                        AnnotationUtils utils, B bb, String parameterName) {
             bb.lineComment(getClass().getName());
-            bb.iff().value().expression(fieldVariableName).isGreaterThan(max)
+
+            if (nullable) {
+                ClassBuilder.IfBuilder<B> iff = bb.iff().isNotNull(fieldVariableName).endCondition();
+                doGenerate(fieldVariableName, problemsListVariableName, addMethodName, utils, iff, parameterName);
+                iff.endIf();
+            } else {
+                doGenerate(fieldVariableName, problemsListVariableName, addMethodName, utils, bb, parameterName);
+            }
+
+        }
+
+        private <T, B extends ClassBuilder.BlockBuilderBase<T, B, X>, X>
+                void doGenerate(String fieldVariableName, String problemsListVariableName, String addMethodName,
+                        AnnotationUtils utils, B bb, String parameterName) {
+
+            ComparisonBuilder<IfBuilder<B>> test;
+            if (isNumber) {
+                test = bb.iff().value().invoke("floatValue").on(fieldVariableName);
+            } else {
+                test = bb.iff().value().expression(fieldVariableName);
+            }
+
+            test.isGreaterThan(max)
                     .invoke(addMethodName)
                     .withStringConcatentationArgument(parameterName)
                     .append(" must be less than or equal to ")
@@ -94,6 +132,7 @@ public class FloatMinMaxHandler implements ConstraintHandler {
                     .append(" but is ").appendExpression(fieldVariableName)
                     .endConcatenation().on(problemsListVariableName)
                     .endIf();
+
         }
 
         @Override
@@ -110,17 +149,37 @@ public class FloatMinMaxHandler implements ConstraintHandler {
     private static class FloatMinGenerator implements ConstraintGenerator {
 
         private final float min;
+        private final boolean isNumber;
+        private final boolean nullable;
 
-        FloatMinGenerator(AnnotationUtils utils, AnnotationMirror min) {
+        FloatMinGenerator(AnnotationUtils utils, AnnotationMirror min, boolean isNumber, boolean nullable) {
             this.min = utils.annotationValue(min, "value", Float.class, Float.MIN_VALUE);
+            this.isNumber = isNumber;
+            this.nullable = nullable;
         }
 
         @Override
         public <T, B extends ClassBuilder.BlockBuilderBase<T, B, X>, X> void generate(
                 String fieldVariableName, String problemsListVariableName, String addMethodName, AnnotationUtils utils, B bb, String parameterName) {
             bb.lineComment(getClass().getName());
-            bb.iff().value()
-                    .expression(fieldVariableName)
+            if (nullable) {
+                ClassBuilder.IfBuilder<B> iff = bb.iff().isNotNull(fieldVariableName).endCondition();
+                doGenerate(fieldVariableName, problemsListVariableName, addMethodName, utils, iff, parameterName);
+                iff.endIf();
+            } else {
+                doGenerate(fieldVariableName, problemsListVariableName, addMethodName, utils, bb, parameterName);
+            }
+        }
+
+        private <T, B extends ClassBuilder.BlockBuilderBase<T, B, X>, X> void doGenerate(
+                String fieldVariableName, String problemsListVariableName, String addMethodName, AnnotationUtils utils, B bb, String parameterName) {
+            ComparisonBuilder<IfBuilder<B>> test;
+            if (isNumber) {
+                test = bb.iff().value().invoke("floatValue").on(fieldVariableName);
+            } else {
+                test = bb.iff().value().expression(fieldVariableName);
+            }
+            test
                     .isLessThan(min)
                     .invoke(addMethodName)
                     .withStringConcatentationArgument(parameterName)
@@ -139,7 +198,7 @@ public class FloatMinMaxHandler implements ConstraintHandler {
 
         @Override
         public String toString() {
-            return getClass().getSimpleName() + "(" + min + /* " nullable " + nullable + */ ")";
+            return getClass().getSimpleName() + "(" + min +  " nullable " + nullable + ")";
         }
     }
 }

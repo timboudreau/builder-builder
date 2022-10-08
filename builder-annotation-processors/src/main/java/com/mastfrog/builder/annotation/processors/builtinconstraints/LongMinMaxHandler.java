@@ -54,19 +54,21 @@ public class LongMinMaxHandler implements ConstraintHandler {
         AnnotationMirror min = utils.findAnnotationMirror(parameterElement, LONG_MIN);
         AnnotationMirror max = utils.findAnnotationMirror(parameterElement, LONG_MAX);
         boolean nullable = utils.findAnnotationMirror(parameterElement, NULLABLE_ANNOTATION) != null;
-        boolean isNumber;
         if (min != null || max != null) {
             TypeMirror paramType = parameterElement.asType();
-            isNumber = utils.isAssignable(paramType, Number.class.getName());
-            if (!isNumber && !utils.isAssignable(paramType, Long.class.getName()) && !utils.isAssignable(paramType, long.class.getName())) {
+            boolean isBoxedLong = utils.isAssignable(paramType, Long.class.getName());
+            boolean isPrimitiveLong = !isBoxedLong && utils.isAssignable(paramType, long.class.getName());
+            boolean isNumber = !isBoxedLong && !isPrimitiveLong
+                    && utils.isAssignable(paramType, Number.class.getName());
+            if (!isNumber && !isBoxedLong && !isPrimitiveLong) {
                 utils.fail("Cannot apply IntMin or LongMax to a " + paramType, parameterElement, (min == null ? min : max));
                 return;
             }
             if (min != null) {
-                genConsumer.accept(new LongMinGenerator(utils, min, nullable, isNumber && !"long".equals(parameterElement.asType().toString())));
+                genConsumer.accept(new LongMinGenerator(utils, min, nullable, isNumber));
             }
             if (max != null) {
-                genConsumer.accept(new LongMaxGenerator(utils, max, nullable, isNumber && !"long".equals(parameterElement.asType().toString())));
+                genConsumer.accept(new LongMaxGenerator(utils, max, nullable, isNumber));
             }
         }
     }
@@ -113,6 +115,8 @@ public class LongMinMaxHandler implements ConstraintHandler {
             } else {
                 tst = bb.iff().value().invoke("longValue").on(fieldVariableName);
             }
+            bb.lineComment("Is number? " + isNumber);
+            bb.lineComment("Nullable? " + nullable);
 
             tst.isGreaterThan(max)
                     .invoke(addMethodName)
@@ -168,6 +172,8 @@ public class LongMinMaxHandler implements ConstraintHandler {
             } else {
                 tst = bb.iff().value().invoke("longValue").on(fieldVariableName);
             }
+            bb.lineComment("Is number? " + isNumber);
+            bb.lineComment("Nullable? " + nullable);
 
             tst.isLessThan(min)
                     .invoke(addMethodName)

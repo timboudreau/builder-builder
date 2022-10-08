@@ -28,6 +28,10 @@ import com.mastfrog.builder.annotation.processors.spi.ConstraintGenerator;
 import static com.mastfrog.builder.annotation.processors.spi.ConstraintGenerator.NULLABLE_ANNOTATION;
 import com.mastfrog.builder.annotation.processors.spi.ConstraintHandler;
 import com.mastfrog.java.vogon.ClassBuilder;
+import com.mastfrog.java.vogon.ClassBuilder.BlockBuilderBase;
+import com.mastfrog.java.vogon.ClassBuilder.ComparisonBuilder;
+import com.mastfrog.java.vogon.ClassBuilder.IfBuilder;
+import com.mastfrog.java.vogon.ClassBuilder.ValueExpressionBuilder;
 import com.mastfrog.util.service.ServiceProvider;
 import java.util.function.Consumer;
 import javax.lang.model.element.AnnotationMirror;
@@ -42,26 +46,31 @@ import javax.lang.model.type.TypeMirror;
 @ServiceProvider(ConstraintHandler.class)
 public class ByteMinMaxHandler implements ConstraintHandler {
 
-    private static final String INT_MIN = "com.mastfrog.builder.annotations.constraint.ByteMin";
-    private static final String INT_MAX = "com.mastfrog.builder.annotations.constraint.ByteMax";
+    private static final String BYTE_MIN = "com.mastfrog.builder.annotations.constraint.ByteMin";
+    private static final String BYTE_MAX = "com.mastfrog.builder.annotations.constraint.ByteMax";
 
     @Override
     public void collect(AnnotationUtils utils, Element targetElement, VariableElement parameterElement,
             Consumer<ConstraintGenerator> genConsumer) {
-        AnnotationMirror min = utils.findAnnotationMirror(parameterElement, INT_MIN);
-        AnnotationMirror max = utils.findAnnotationMirror(parameterElement, INT_MAX);
+        AnnotationMirror min = utils.findAnnotationMirror(parameterElement, BYTE_MIN);
+        AnnotationMirror max = utils.findAnnotationMirror(parameterElement, BYTE_MAX);
         boolean nullable = utils.findAnnotationMirror(parameterElement, NULLABLE_ANNOTATION) != null;
         if (min != null || max != null) {
             TypeMirror paramType = parameterElement.asType();
-            if (!utils.isAssignable(paramType, Short.class.getName()) && !utils.isAssignable(paramType, short.class.getName())) {
+            boolean isBoxedByte = utils.isAssignable(paramType, Byte.class.getName());
+            boolean isPrimitiveByte = !isBoxedByte && utils.isAssignable(paramType, byte.class.getName());
+            boolean isNumber = !isBoxedByte && !isPrimitiveByte
+                    && utils.isAssignable(paramType, Number.class.getName());
+
+            if (!isBoxedByte && !isPrimitiveByte && !isNumber) {
                 utils.fail("Cannot apply ByteMin or ByteMax to a " + paramType, parameterElement, (min == null ? min : max));
                 return;
             }
             if (min != null) {
-                genConsumer.accept(new ByteMinGenerator(utils, min, nullable));
+                genConsumer.accept(new ByteMinGenerator(utils, min, nullable, isNumber));
             }
             if (max != null) {
-                genConsumer.accept(new ByteMaxGenerator(utils, max, nullable));
+                genConsumer.accept(new ByteMaxGenerator(utils, max, nullable, isNumber));
             }
         }
     }
@@ -78,17 +87,40 @@ public class ByteMinMaxHandler implements ConstraintHandler {
 
         private final byte max;
         private final boolean nullable;
+        private final boolean isNumber;
 
-        ByteMaxGenerator(AnnotationUtils utils, AnnotationMirror max, boolean nullable) {
+        ByteMaxGenerator(AnnotationUtils utils, AnnotationMirror max, boolean nullable, boolean isNumber) {
             this.max = utils.annotationValue(max, "value", Byte.class, Byte.MAX_VALUE);
             this.nullable = nullable;
+            this.isNumber = isNumber;
         }
 
         @Override
-        public <T, B extends ClassBuilder.BlockBuilderBase<T, B, X>, X> void
+        public <T, B extends BlockBuilderBase<T, B, X>, X> void
                 generate(String fieldVariableName, String problemsListVariableName, String addMethodName, AnnotationUtils utils, B bb, String parameterName) {
             bb.lineComment(getClass().getName());
-            bb.iff().value().expression(fieldVariableName).isGreaterThan(max)
+            if (nullable) {
+                IfBuilder<B> test = bb.ifNotNull(fieldVariableName);
+                doGenerate(fieldVariableName, problemsListVariableName, addMethodName,
+                        utils, test, parameterName);
+                test.endIf();
+            } else {
+                doGenerate(fieldVariableName, problemsListVariableName, addMethodName,
+                        utils, bb, parameterName);
+            }
+        }
+
+        private <T, B extends BlockBuilderBase<T, B, X>, X> void
+                doGenerate(String fieldVariableName, String problemsListVariableName,
+                        String addMethodName, AnnotationUtils utils, B bb, String parameterName) {
+            ComparisonBuilder<IfBuilder<B>> test;
+            if (isNumber) {
+                test = bb.iff().value().invoke("byteValue").on(fieldVariableName);
+            } else {
+                test = bb.iff().value().expression(fieldVariableName);
+            }
+
+            test.isGreaterThan(max)
                     .invoke(addMethodName)
                     .withStringConcatentationArgument(fieldVariableName)
                     .append(" must be less than or equal to ")
@@ -114,10 +146,12 @@ public class ByteMinMaxHandler implements ConstraintHandler {
 
         private final int min;
         private final boolean nullable;
+        private final boolean isNumber;
 
-        ByteMinGenerator(AnnotationUtils utils, AnnotationMirror min, boolean nullable) {
+        ByteMinGenerator(AnnotationUtils utils, AnnotationMirror min, boolean nullable, boolean isNumber) {
             this.min = utils.annotationValue(min, "value", Byte.class, Byte.MIN_VALUE);
             this.nullable = nullable;
+            this.isNumber = isNumber;
         }
 
         @Override
@@ -126,19 +160,37 @@ public class ByteMinMaxHandler implements ConstraintHandler {
         }
 
         @Override
-        public <T, B extends ClassBuilder.BlockBuilderBase<T, B, X>, X> void generate(String fieldVariableName, String problemsListVariableName, String addMethodName, AnnotationUtils utils, B bb, String parameterName) {
+        public <T, B extends ClassBuilder.BlockBuilderBase<T, B, X>, X> void generate(
+                String fieldVariableName, String problemsListVariableName,
+                String addMethodName, AnnotationUtils utils, B bb, String parameterName) {
+
             bb.lineComment(getClass().getName());
-            ClassBuilder.ValueExpressionBuilder<ClassBuilder.ComparisonBuilder<ClassBuilder.IfBuilder<B>>> ifb = bb
-                    .iff().value();
             if (nullable) {
-                ifb = ifb.invoke("_isSet").withArgument(fieldVariableName).on("this").isTrue().and()
-                        .value();
+                IfBuilder<B> test = bb.ifNotNull(fieldVariableName);
+                doGenerate(fieldVariableName, problemsListVariableName, addMethodName,
+                        utils, test, parameterName);
+                test.endIf();
+            } else {
+                doGenerate(fieldVariableName, problemsListVariableName, addMethodName,
+                        utils, bb, parameterName);
             }
-            ifb.expression(fieldVariableName)
-                    .isLessThan(min)
+
+        }
+
+        private <T, B extends ClassBuilder.BlockBuilderBase<T, B, X>, X> void doGenerate(
+                String fieldVariableName, String problemsListVariableName,
+                String addMethodName, AnnotationUtils utils, B bb, String parameterName) {
+            ComparisonBuilder<IfBuilder<B>> test;
+            if (isNumber) {
+                test = bb.iff().value().invoke("byteValue").on(fieldVariableName);
+            } else {
+                test = bb.iff().value().expression(fieldVariableName);
+            }
+
+            test.isLessThan(min)
                     .invoke(addMethodName)
-                    .withStringConcatentationArgument(parameterName)
-                    .append(" must be greater than or equal to ")
+                    .withStringConcatentationArgument(fieldVariableName)
+                    .append(" must be less than or equal to ")
                     .append(min)
                     .append(" but is ").appendExpression(fieldVariableName)
                     .endConcatenation()

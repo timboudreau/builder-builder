@@ -96,22 +96,15 @@ public final class BigMinMaxHandler implements ConstraintHandler {
     }
 
     private static TypeMirror supplierType(AnnotationUtils utils, VariableElement parameterElement) {
-        System.out.println("CHECK SUPP " + parameterElement.asType());
-        System.out.println("ERAS " + utils.erasureOf(parameterElement.asType()));
-
         boolean isSupplier = utils.isAssignable(utils.erasureOf(parameterElement.asType()), Supplier.class.getName());
         if (!isSupplier) {
-            System.out.println("  NOT SUPPLIER " + parameterElement.asType());
             return null;
         }
-        System.out.println("IS SUPP " + parameterElement.asType());
         TypeElement el = utils.typeElementOfField(parameterElement);
-        System.out.println("TE OF FIELD " + el);
         if (el == null) {
             return null;
         }
         TypeMirror param = utils.getTypeParameter(0, el);
-        System.out.println("  TYPE PARAM " + param);
         return param;
     }
 

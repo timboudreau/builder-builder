@@ -57,7 +57,7 @@ public class DoubleMinMaxHandler implements ConstraintHandler {
         if (min != null || max != null) {
             TypeMirror paramType = parameterElement.asType();
             boolean isBoxedDouble = utils.isAssignable(paramType, Double.class.getName());
-            boolean isPrimitiveDouble = utils.isAssignable(paramType, double.class.getName());
+            boolean isPrimitiveDouble = !isBoxedDouble && utils.isAssignable(paramType, double.class.getName());
             boolean isNumber
                     = !isBoxedDouble && !isPrimitiveDouble
                     && utils.isAssignable(paramType, Number.class.getName());
@@ -101,8 +101,16 @@ public class DoubleMinMaxHandler implements ConstraintHandler {
                 String fieldVariableName, String problemsListVariableName, String addMethodName, AnnotationUtils utils, B bb, String parameterName) {
             bb.lineComment(getClass().getName());
             if (nullable) {
-                bb.ifNull(fieldVariableName).returning(fieldVariableName).endIf();
+                ClassBuilder.IfBuilder<B> iff = bb.iff().isNotNull(fieldVariableName).endCondition();
+                doGenerate(fieldVariableName, problemsListVariableName, addMethodName, utils, iff, parameterName);
+                iff.endIf();
+            } else {
+                doGenerate(fieldVariableName, problemsListVariableName, addMethodName, utils, bb, parameterName);
             }
+        }
+
+        public <T, B extends ClassBuilder.BlockBuilderBase<T, B, X>, X> void doGenerate(
+                String fieldVariableName, String problemsListVariableName, String addMethodName, AnnotationUtils utils, B bb, String parameterName) {
             ComparisonBuilder<IfBuilder<B>> tst;
             if (!isNumber) {
                 tst = bb.iff().value().expression(fieldVariableName);
@@ -148,12 +156,23 @@ public class DoubleMinMaxHandler implements ConstraintHandler {
 
         @Override
         public <T, B extends ClassBuilder.BlockBuilderBase<T, B, X>, X>
-                void generate(String fieldVariableName, String problemsListVariableName, String addMethodName, AnnotationUtils utils, B bb, String parameterName) {
+                void generate(String localFieldName, String problemsListVariableName,
+                        String addMethodName, AnnotationUtils utils, B bb, String parameterName) {
             bb.lineComment(getClass().getName());
             if (nullable) {
-                bb.ifNull(fieldVariableName).returning(fieldVariableName).endIf();
+                ClassBuilder.IfBuilder<B> iff = bb.iff().isNotNull(localFieldName).endCondition();
+                doGenerate(localFieldName, problemsListVariableName, addMethodName,
+                        utils, iff, parameterName);
+                iff.endIf();
+            } else {
+                doGenerate(localFieldName, problemsListVariableName, addMethodName,
+                        utils, bb, parameterName);
             }
+        }
 
+        public <T, B extends ClassBuilder.BlockBuilderBase<T, B, X>, X>
+                void doGenerate(String fieldVariableName, String problemsListVariableName,
+                        String addMethodName, AnnotationUtils utils, B bb, String parameterName) {
             ComparisonBuilder<IfBuilder<B>> tst;
             if (!isNumber) {
                 tst = bb.iff().value().expression(fieldVariableName);
@@ -170,6 +189,7 @@ public class DoubleMinMaxHandler implements ConstraintHandler {
                     .endConcatenation()
                     .on(problemsListVariableName)
                     .endIf();
+
         }
 
         @Override

@@ -25,8 +25,11 @@ package com.mastfrog.builder.annotation.processors.builtinconstraints;
 
 import com.mastfrog.annotation.AnnotationUtils;
 import com.mastfrog.builder.annotation.processors.spi.ConstraintGenerator;
+import static com.mastfrog.builder.annotation.processors.spi.ConstraintGenerator.NULLABLE_ANNOTATION;
 import com.mastfrog.builder.annotation.processors.spi.ConstraintHandler;
 import com.mastfrog.java.vogon.ClassBuilder;
+import com.mastfrog.java.vogon.ClassBuilder.ComparisonBuilder;
+import com.mastfrog.java.vogon.ClassBuilder.IfBuilder;
 import com.mastfrog.util.service.ServiceProvider;
 import java.util.function.Consumer;
 import javax.lang.model.element.AnnotationMirror;
@@ -49,18 +52,24 @@ public class ShortMinMaxHandler implements ConstraintHandler {
             Consumer<ConstraintGenerator> genConsumer) {
         AnnotationMirror min = utils.findAnnotationMirror(parameterElement, SHORT_MIN);
         AnnotationMirror max = utils.findAnnotationMirror(parameterElement, SHORT_MAX);
+        boolean nullable = utils.findAnnotationMirror(parameterElement, NULLABLE_ANNOTATION) != null;
         if (min != null || max != null) {
             TypeMirror paramType = parameterElement.asType();
-            if (!utils.isAssignable(paramType, Short.class.getName()) && !utils.isAssignable(paramType, short.class.getName())) {
+            boolean isBoxedShort = utils.isAssignable(paramType, Short.class.getName());
+            boolean isPrimitiveShort = !isBoxedShort &&
+                    utils.isAssignable(paramType, short.class.getName());
+            boolean isNumber = !isBoxedShort && !isPrimitiveShort
+                    && utils.isAssignable(paramType, Number.class.getName());
+            if (!isBoxedShort && !isPrimitiveShort && !isNumber) {
                 utils.fail("Cannot apply ShortMin or ShortMax to a " + paramType, parameterElement, (min == null ? min : max));
                 return;
             }
-        }
-        if (min != null) {
-            genConsumer.accept(new MinGenerator(utils, min));
-        }
-        if (max != null) {
-            genConsumer.accept(new ShortMaxGenerator(utils, max));
+            if (min != null) {
+                genConsumer.accept(new ShortMinGenerator(utils, min, isNumber, nullable));
+            }
+            if (max != null) {
+                genConsumer.accept(new ShortMaxGenerator(utils, max, isNumber, nullable));
+            }
         }
     }
 
@@ -75,15 +84,45 @@ public class ShortMinMaxHandler implements ConstraintHandler {
     private static class ShortMaxGenerator implements ConstraintGenerator {
 
         private final short max;
+        private final boolean isNumber;
+        private final boolean nullable;
 
-        ShortMaxGenerator(AnnotationUtils utils, AnnotationMirror max) {
+        ShortMaxGenerator(AnnotationUtils utils, AnnotationMirror max, boolean isNumber, boolean nullable) {
             this.max = utils.annotationValue(max, "value", Short.class, Short.MAX_VALUE);
+            this.isNumber = isNumber;
+            this.nullable = nullable;
         }
 
         @Override
-        public <T, B extends ClassBuilder.BlockBuilderBase<T, B, X>, X> void generate(String fieldVariableName, String problemsListVariableName, String addMethodName, AnnotationUtils utils, B bb, String parameterName) {
+        public <T, B extends ClassBuilder.BlockBuilderBase<T, B, X>, X> void generate(
+                String localFieldName, String problemsListVariableName,
+                String addMethodName, AnnotationUtils utils, B bb, String parameterName) {
             bb.lineComment(getClass().getName());
-            bb.iff().value().expression(fieldVariableName).isGreaterThan(max)
+            if (nullable) {
+                IfBuilder<B> iff = bb.iff().isNotNull(localFieldName).endCondition();
+                doGenerate(localFieldName, problemsListVariableName, addMethodName,
+                        utils, iff, parameterName);
+                iff.endIf();
+            } else {
+                doGenerate(localFieldName, problemsListVariableName, addMethodName,
+                        utils, bb, parameterName);
+            }
+        }
+
+        private <T, B extends ClassBuilder.BlockBuilderBase<T, B, X>, X> void doGenerate(
+                String fieldVariableName, String problemsListVariableName,
+                String addMethodName, AnnotationUtils utils, B bb, String parameterName) {
+            ComparisonBuilder<IfBuilder<B>> test;
+            if (isNumber) {
+                test = bb.iff().value()
+                        .invoke("shortValue")
+                        .on(fieldVariableName);
+            } else {
+                test = bb.iff().value()
+                        .expression(fieldVariableName);
+            }
+
+            test.isGreaterThan(max)
                     .invoke(addMethodName)
                     .withStringConcatentationArgument(parameterName)
                     .append(" must be less than or equal to ")
@@ -104,19 +143,48 @@ public class ShortMinMaxHandler implements ConstraintHandler {
         }
     }
 
-    private static class MinGenerator implements ConstraintGenerator {
+    private static class ShortMinGenerator implements ConstraintGenerator {
 
         private final short min;
+        private final boolean isNumber;
+        private final boolean nullable;
 
-        MinGenerator(AnnotationUtils utils, AnnotationMirror min) {
+        ShortMinGenerator(AnnotationUtils utils, AnnotationMirror min, boolean isNumber, boolean nullable) {
             this.min = utils.annotationValue(min, "value", Short.class, Short.MIN_VALUE);
+            this.isNumber = isNumber;
+            this.nullable = nullable;
         }
 
         @Override
         public <T, B extends ClassBuilder.BlockBuilderBase<T, B, X>, X> void generate(
-                String fieldVariableName, String problemsListVariableName, String addMethodName, AnnotationUtils utils, B bb, String parameterName) {
-            bb.iff().value()
-                    .expression(fieldVariableName)
+                String localFieldName, String problemsListVariableName,
+                String addMethodName, AnnotationUtils utils, B bb, String parameterName) {
+            bb.lineComment(getClass().getName());
+            if (nullable) {
+                IfBuilder<B> iff = bb.iff().isNotNull(localFieldName).endCondition();
+                doGenerate(localFieldName, problemsListVariableName, addMethodName,
+                        utils, iff, parameterName);
+                iff.endIf();
+            } else {
+                doGenerate(localFieldName, problemsListVariableName, addMethodName,
+                        utils, bb, parameterName);
+            }
+        }
+
+        private <T, B extends ClassBuilder.BlockBuilderBase<T, B, X>, X> void doGenerate(
+                String fieldVariableName, String problemsListVariableName,
+                String addMethodName, AnnotationUtils utils, B bb, String parameterName) {
+            ComparisonBuilder<IfBuilder<B>> test;
+            if (isNumber) {
+                test = bb.iff().value()
+                        .invoke("shortValue")
+                        .on(fieldVariableName);
+            } else {
+                test = bb.iff().value()
+                        .expression(fieldVariableName);
+            }
+
+            test
                     .isLessThan(min)
                     .invoke(addMethodName)
                     .withStringConcatentationArgument(parameterName)
@@ -126,6 +194,7 @@ public class ShortMinMaxHandler implements ConstraintHandler {
                     .endConcatenation()
                     .on(problemsListVariableName)
                     .endIf();
+
         }
 
         @Override

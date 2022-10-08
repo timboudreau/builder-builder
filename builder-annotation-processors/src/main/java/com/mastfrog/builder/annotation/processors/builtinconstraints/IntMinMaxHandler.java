@@ -28,6 +28,8 @@ import com.mastfrog.builder.annotation.processors.spi.ConstraintGenerator;
 import static com.mastfrog.builder.annotation.processors.spi.ConstraintGenerator.NULLABLE_ANNOTATION;
 import com.mastfrog.builder.annotation.processors.spi.ConstraintHandler;
 import com.mastfrog.java.vogon.ClassBuilder;
+import com.mastfrog.java.vogon.ClassBuilder.ComparisonBuilder;
+import com.mastfrog.java.vogon.ClassBuilder.IfBuilder;
 import com.mastfrog.util.service.ServiceProvider;
 import java.util.function.Consumer;
 import javax.lang.model.element.AnnotationMirror;
@@ -58,16 +60,21 @@ public class IntMinMaxHandler implements ConstraintHandler {
                         utils, min, max, nullable));
                 return;
             }
-            if (!utils.isAssignable(paramType, Integer.class.getName()) && !utils.isAssignable(paramType, int.class.getName())) {
+            boolean isBoxedInt = utils.isAssignable(paramType, Integer.class.getName());
+            boolean isPrimitiveInt = !isBoxedInt && utils.isAssignable(paramType, int.class.getName());
+            boolean isNumber = !isBoxedInt && !isPrimitiveInt
+                    && utils.isAssignable(paramType, Number.class.getName());
+
+            if (!isBoxedInt && !isPrimitiveInt && !isNumber) {
                 utils.fail("Cannot apply IntMin or IntMax to a " + paramType, parameterElement, (min == null ? min : max));
                 return;
             }
-        }
-        if (min != null) {
-            genConsumer.accept(new IntMinGenerator(utils, min, nullable));
-        }
-        if (max != null) {
-            genConsumer.accept(new IntMaxGenerator(utils, max, nullable));
+            if (min != null) {
+                genConsumer.accept(new IntMinGenerator(utils, min, nullable, isNumber));
+            }
+            if (max != null) {
+                genConsumer.accept(new IntMaxGenerator(utils, max, nullable, isNumber));
+            }
         }
     }
 
@@ -83,10 +90,13 @@ public class IntMinMaxHandler implements ConstraintHandler {
 
         private final int max;
         private final boolean nullable;
+        private final boolean isNumber;
 
-        IntMaxGenerator(AnnotationUtils utils, AnnotationMirror max, boolean nullable) {
+        IntMaxGenerator(AnnotationUtils utils, AnnotationMirror max, boolean nullable,
+                boolean isNumber) {
             this.max = utils.annotationValue(max, "value", Integer.class, Integer.MAX_VALUE);
             this.nullable = nullable;
+            this.isNumber = isNumber;
         }
 
         @Override
@@ -105,7 +115,13 @@ public class IntMinMaxHandler implements ConstraintHandler {
         private <T, B extends ClassBuilder.BlockBuilderBase<T, B, X>, X> void apply(String fieldVariableName,
                 String problemsListVariableName, String addMethodName, AnnotationUtils utils, B bb,
                 String parameterName) {
-            bb.iff().value().expression(fieldVariableName).isGreaterThan(max)
+            ComparisonBuilder<IfBuilder<B>> test;
+            if (isNumber) {
+                test = bb.iff().value().invoke("intValue").on(fieldVariableName);
+            } else {
+                test = bb.iff().value().expression(fieldVariableName);
+            }
+            test.isGreaterThan(max)
                     .invoke(addMethodName)
                     .withStringConcatentationArgument(parameterName)
                     .append(" must be less than or equal to ").append(max)
@@ -129,10 +145,12 @@ public class IntMinMaxHandler implements ConstraintHandler {
 
         private final int min;
         private final boolean nullable;
+        private final boolean isNumber;
 
-        IntMinGenerator(AnnotationUtils utils, AnnotationMirror min, boolean nullable) {
+        IntMinGenerator(AnnotationUtils utils, AnnotationMirror min, boolean nullable, boolean isNumber) {
             this.min = utils.annotationValue(min, "value", Integer.class, Integer.MIN_VALUE);
             this.nullable = nullable;
+            this.isNumber = isNumber;
         }
 
         @Override
@@ -151,9 +169,13 @@ public class IntMinMaxHandler implements ConstraintHandler {
         private <T, B extends ClassBuilder.BlockBuilderBase<T, B, X>, X> void apply(String fieldVariableName,
                 String problemsListVariableName, String addMethodName, AnnotationUtils utils, B bb,
                 String parameterName) {
-            bb.iff().value()
-                    .expression(fieldVariableName)
-                    .isLessThan(min)
+            ComparisonBuilder<IfBuilder<B>> test;
+            if (isNumber) {
+                test = bb.iff().value().invoke("intValue").on(fieldVariableName);
+            } else {
+                test = bb.iff().value().expression(fieldVariableName);
+            }
+            test.isLessThan(min)
                     .invoke(addMethodName)
                     .withStringConcatentationArgument(parameterName)
                     .append(" must be greater than or equal to ")
@@ -257,7 +279,7 @@ public class IntMinMaxHandler implements ConstraintHandler {
                 bulletPoints.accept("Parameter is optional.");
             }
             bulletPoints.accept("All values must be &gt;= <code>" + min + "</code>");
-            bulletPoints.accept("All values must be &lt;= <code>" + max+ "</code>");
+            bulletPoints.accept("All values must be &lt;= <code>" + max + "</code>");
         }
 
         @Override
