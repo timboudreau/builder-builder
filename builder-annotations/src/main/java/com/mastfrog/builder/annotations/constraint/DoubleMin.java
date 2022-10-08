@@ -25,7 +25,7 @@ package com.mastfrog.builder.annotations.constraint;
 
 import static java.lang.annotation.ElementType.PARAMETER;
 import java.lang.annotation.Retention;
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
+import static java.lang.annotation.RetentionPolicy.CLASS;
 import java.lang.annotation.Target;
 
 /**
@@ -33,9 +33,9 @@ import java.lang.annotation.Target;
  *
  * @author Tim Boudreau
  */
-@Retention(RUNTIME)
+@Retention(CLASS)
 @Target(PARAMETER)
-@AppliesTo({Double.class, double.class})
+@AppliesTo({Double.class, double.class, Number.class})
 public @interface DoubleMin {
 
     double value();

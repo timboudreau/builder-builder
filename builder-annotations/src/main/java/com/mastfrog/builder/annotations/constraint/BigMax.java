@@ -26,18 +26,19 @@ package com.mastfrog.builder.annotations.constraint;
 import static java.lang.annotation.ElementType.PARAMETER;
 import java.lang.annotation.Retention;
 import static java.lang.annotation.RetentionPolicy.CLASS;
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import java.lang.annotation.Target;
+import java.math.BigDecimal;
+import java.math.BigInteger;
 
 /**
- * <i>Inclusive</i> minimum int value.
+ * Minimum value annotation for BigInteger and BigDecimal types.
  *
  * @author Tim Boudreau
  */
 @Retention(CLASS)
 @Target(PARAMETER)
-@AppliesTo({Long.class, long.class, Number.class})
-public @interface LongMin {
+@AppliesTo({BigInteger.class, BigDecimal.class})
+public @interface BigMax {
 
-    long value();
+    String value();
 }

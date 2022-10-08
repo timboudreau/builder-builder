@@ -28,6 +28,9 @@ import com.mastfrog.builder.annotation.processors.spi.ConstraintGenerator;
 import static com.mastfrog.builder.annotation.processors.spi.ConstraintGenerator.NULLABLE_ANNOTATION;
 import com.mastfrog.builder.annotation.processors.spi.ConstraintHandler;
 import com.mastfrog.java.vogon.ClassBuilder;
+import com.mastfrog.java.vogon.ClassBuilder.ComparisonBuilder;
+import com.mastfrog.java.vogon.ClassBuilder.IfBuilder;
+import com.mastfrog.java.vogon.ClassBuilder.ValueExpressionBuilder;
 import com.mastfrog.util.service.ServiceProvider;
 import java.util.function.Consumer;
 import javax.lang.model.element.AnnotationMirror;
@@ -51,18 +54,20 @@ public class LongMinMaxHandler implements ConstraintHandler {
         AnnotationMirror min = utils.findAnnotationMirror(parameterElement, LONG_MIN);
         AnnotationMirror max = utils.findAnnotationMirror(parameterElement, LONG_MAX);
         boolean nullable = utils.findAnnotationMirror(parameterElement, NULLABLE_ANNOTATION) != null;
+        boolean isNumber;
         if (min != null || max != null) {
             TypeMirror paramType = parameterElement.asType();
-            if (!utils.isAssignable(paramType, Long.class.getName()) && !utils.isAssignable(paramType, long.class.getName())) {
+            isNumber = utils.isAssignable(paramType, Number.class.getName());
+            if (!isNumber && !utils.isAssignable(paramType, Long.class.getName()) && !utils.isAssignable(paramType, long.class.getName())) {
                 utils.fail("Cannot apply IntMin or LongMax to a " + paramType, parameterElement, (min == null ? min : max));
                 return;
             }
-        }
-        if (min != null) {
-            genConsumer.accept(new LongMinGenerator(utils, min, nullable));
-        }
-        if (max != null) {
-            genConsumer.accept(new LongMaxGenerator(utils, max, nullable));
+            if (min != null) {
+                genConsumer.accept(new LongMinGenerator(utils, min, nullable, isNumber && !"long".equals(parameterElement.asType().toString())));
+            }
+            if (max != null) {
+                genConsumer.accept(new LongMaxGenerator(utils, max, nullable, isNumber && !"long".equals(parameterElement.asType().toString())));
+            }
         }
     }
 
@@ -78,10 +83,12 @@ public class LongMinMaxHandler implements ConstraintHandler {
 
         private final long max;
         private final boolean nullable;
+        private final boolean isNumber;
 
-        LongMaxGenerator(AnnotationUtils utils, AnnotationMirror max, boolean nullable) {
+        LongMaxGenerator(AnnotationUtils utils, AnnotationMirror max, boolean nullable, boolean isNumber) {
             this.max = utils.annotationValue(max, "value", Long.class, Long.MAX_VALUE);
             this.nullable = nullable;
+            this.isNumber = isNumber;
         }
 
         @Override
@@ -100,7 +107,14 @@ public class LongMinMaxHandler implements ConstraintHandler {
         private <T, B extends ClassBuilder.BlockBuilderBase<T, B, X>, X> void apply(
                 String fieldVariableName, String problemsListVariableName, String addMethodName, AnnotationUtils utils, B bb, String parameterName) {
             bb.lineComment(getClass().getName());
-            bb.iff().value().expression(fieldVariableName).isGreaterThan(max)
+            ComparisonBuilder<IfBuilder<B>> tst;
+            if (!isNumber) {
+                tst = bb.iff().value().expression(fieldVariableName);
+            } else {
+                tst = bb.iff().value().invoke("longValue").on(fieldVariableName);
+            }
+
+            tst.isGreaterThan(max)
                     .invoke(addMethodName)
                     .withStringConcatentationArgument(parameterName)
                     .append(" must be less than or equal to ").append(max)
@@ -124,10 +138,12 @@ public class LongMinMaxHandler implements ConstraintHandler {
 
         private final long min;
         private final boolean nullable;
+        private final boolean isNumber;
 
-        LongMinGenerator(AnnotationUtils utils, AnnotationMirror min, boolean nullable) {
+        LongMinGenerator(AnnotationUtils utils, AnnotationMirror min, boolean nullable, boolean isNumber) {
             this.min = utils.annotationValue(min, "value", Long.class, Long.MIN_VALUE);
             this.nullable = nullable;
+            this.isNumber = isNumber;
         }
 
         @Override
@@ -146,9 +162,14 @@ public class LongMinMaxHandler implements ConstraintHandler {
         private <T, B extends ClassBuilder.BlockBuilderBase<T, B, X>, X> void apply(
                 String fieldVariableName, String problemsListVariableName, String addMethodName, AnnotationUtils utils, B bb, String parameterName) {
             bb.lineComment(getClass().getName());
-            bb.iff().value()
-                    .expression(fieldVariableName)
-                    .isLessThan(min)
+            ComparisonBuilder<IfBuilder<B>> tst;
+            if (!isNumber) {
+                tst = bb.iff().value().expression(fieldVariableName);
+            } else {
+                tst = bb.iff().value().invoke("longValue").on(fieldVariableName);
+            }
+
+            tst.isLessThan(min)
                     .invoke(addMethodName)
                     .withStringConcatentationArgument(parameterName)
                     .append(" must be greater than or equal to ")

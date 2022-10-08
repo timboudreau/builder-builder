@@ -126,7 +126,7 @@ public class StringPatternHandler implements ConstraintHandler {
                     bldr.topLevel().field(patternVarName(), fb -> {
                         fb.withModifier(Modifier.PRIVATE, Modifier.STATIC, Modifier.FINAL)
                                 .initializedFromInvocationOf("compile")
-                                .withStringLiteral(doubleBackslashes(pattern.pattern()))
+                                .withStringLiteral(pattern.pattern())
                                 .on("Pattern")
                                 .ofType(Pattern.class.getSimpleName());
                     });

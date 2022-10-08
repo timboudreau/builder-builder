@@ -24,6 +24,7 @@
 package com.mastfrog.builder.annotation.processors;
 
 import com.mastfrog.annotation.AnnotationUtils;
+import com.mastfrog.builder.annotation.processors.builtinconstraints.BigMinMaxHandler;
 import com.mastfrog.builder.annotation.processors.builtinconstraints.ByteMinMaxHandler;
 import com.mastfrog.builder.annotation.processors.builtinconstraints.CollectionAndArraySizeHandler;
 import com.mastfrog.builder.annotation.processors.builtinconstraints.DoubleMinMaxHandler;
@@ -65,6 +66,7 @@ final class ConstraintHandlers implements ConstraintHandler {
             all.add(new DoubleMinMaxHandler());
             all.add(new StringPatternHandler());
             all.add(new CollectionAndArraySizeHandler());
+            all.add(new BigMinMaxHandler());
         }
         return all;
     }

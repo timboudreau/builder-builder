@@ -57,12 +57,12 @@ public class ByteMinMaxHandler implements ConstraintHandler {
                 utils.fail("Cannot apply ByteMin or ByteMax to a " + paramType, parameterElement, (min == null ? min : max));
                 return;
             }
-        }
-        if (min != null) {
-            genConsumer.accept(new ByteMinGenerator(utils, min, nullable));
-        }
-        if (max != null) {
-            genConsumer.accept(new ByteMaxGenerator(utils, max, nullable));
+            if (min != null) {
+                genConsumer.accept(new ByteMinGenerator(utils, min, nullable));
+            }
+            if (max != null) {
+                genConsumer.accept(new ByteMaxGenerator(utils, max, nullable));
+            }
         }
     }
 

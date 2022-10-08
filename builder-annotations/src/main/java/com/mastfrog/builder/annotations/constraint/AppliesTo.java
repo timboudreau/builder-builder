@@ -21,7 +21,6 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-
 package com.mastfrog.builder.annotations.constraint;
 
 import static java.lang.annotation.ElementType.ANNOTATION_TYPE;
@@ -36,5 +35,6 @@ import java.lang.annotation.Target;
 @Retention(RUNTIME)
 @Target(ANNOTATION_TYPE)
 public @interface AppliesTo {
+
     Class[] value() default {};
 }
