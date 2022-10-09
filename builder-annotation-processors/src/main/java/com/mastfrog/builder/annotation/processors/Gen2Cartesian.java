@@ -68,6 +68,7 @@ public class Gen2Cartesian {
         ClassBuilder<String> cb = initDebug(ClassBuilder.forPackage(desc.packageName())
                 .named(desc.builderName)
                 .withModifier(PUBLIC, FINAL)
+                .docComment("Builder for a " + desc.targetTypeName + ".")
                 .autoToString());
         initTree();
         List<OneBuilderModel> models = new ArrayList<>(this.models.values());
@@ -164,6 +165,11 @@ public class Gen2Cartesian {
             ClassBuilder<?> result = isRoot() ? cb : cb.innerClass(name)
                     .withModifier(PUBLIC, FINAL)
                     .autoToString();
+            if (!isRoot()) {
+                cb.docComment("Intermediate builder for a <code>"
+                        + desc.targetTypeName + "</code> obtained from a "
+                        + "setter method on another builder.");
+            }
             if (result.topLevel() != result) {
                 try {
                     result.withModifier(STATIC);

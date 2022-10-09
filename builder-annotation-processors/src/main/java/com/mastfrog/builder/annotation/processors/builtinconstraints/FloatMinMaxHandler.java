@@ -57,8 +57,8 @@ public class FloatMinMaxHandler implements ConstraintHandler {
         if (min != null || max != null) {
             TypeMirror paramType = parameterElement.asType();
 
-            boolean isBoxedDouble = utils.isAssignable(paramType, Double.class.getName());
-            boolean isPrimitiveDouble = !isBoxedDouble && utils.isAssignable(paramType, double.class.getName());
+            boolean isBoxedDouble = utils.isAssignable(paramType, Float.class.getName());
+            boolean isPrimitiveDouble = !isBoxedDouble && utils.isAssignable(paramType, float.class.getName());
             boolean isNumber
                     = !isBoxedDouble && !isPrimitiveDouble
                     && utils.isAssignable(paramType, Number.class.getName());
@@ -69,7 +69,8 @@ public class FloatMinMaxHandler implements ConstraintHandler {
                 return;
             }
             if (min != null) {
-                genConsumer.accept(new FloatMinGenerator(utils, min, isNumber, nullable));
+                genConsumer.accept(new FloatMinGenerator(utils, min,
+                        isNumber, nullable));
             }
             if (max != null) {
                 genConsumer.accept(new FloatMaxGenerator(utils, max, isNumber, nullable));
@@ -91,8 +92,10 @@ public class FloatMinMaxHandler implements ConstraintHandler {
         private final boolean nullable;
         private final boolean isNumber;
 
-        FloatMaxGenerator(AnnotationUtils utils, AnnotationMirror max, boolean isNumber, boolean nullable) {
-            this.max = utils.annotationValue(max, "value", Float.class, Float.MAX_VALUE);
+        FloatMaxGenerator(AnnotationUtils utils, AnnotationMirror max,
+                boolean isNumber, boolean nullable) {
+            this.max = utils.annotationValue(max, "value", Float.class,
+                    Float.MAX_VALUE);
             this.isNumber = isNumber;
             this.nullable = nullable;
         }
@@ -102,6 +105,9 @@ public class FloatMinMaxHandler implements ConstraintHandler {
                 void generate(String fieldVariableName, String problemsListVariableName, String addMethodName,
                         AnnotationUtils utils, B bb, String parameterName) {
             bb.lineComment(getClass().getName());
+
+            bb.lineComment("isNumber " + isNumber);
+            bb.lineComment("nullable " + nullable);
 
             if (nullable) {
                 ClassBuilder.IfBuilder<B> iff = bb.iff().isNotNull(fieldVariableName).endCondition();

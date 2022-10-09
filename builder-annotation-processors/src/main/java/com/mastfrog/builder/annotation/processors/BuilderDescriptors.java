@@ -494,7 +494,7 @@ final class BuilderDescriptors {
 
             String setterJavadoc() {
                 StringBuilder sb = new StringBuilder("Sets the ")
-                        .append(optional ? "<i>optional</i>" : "<b>required</b> ")
+                        .append(optional ? "<i>optional</i> " : "<b>required</b> ")
                         .append("parameter <code>")
                         .append(fieldName).append("</code> of ")
                         .append(" type <code>")

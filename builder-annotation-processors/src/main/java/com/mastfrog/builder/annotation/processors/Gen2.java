@@ -47,7 +47,7 @@ public class Gen2 {
         ClassBuilder<String> cb = initDebug(ClassBuilder
                 .forPackage(desc.packageName())
                 .named(desc.targetTypeName + "Builder")
-                .docComment("Builder for a " + desc.targetTypeName)
+                .docComment("Builder for a " + desc.targetTypeName + ".")
                 .withModifier(Modifier.PUBLIC, Modifier.FINAL)
                 .autoToString());
 

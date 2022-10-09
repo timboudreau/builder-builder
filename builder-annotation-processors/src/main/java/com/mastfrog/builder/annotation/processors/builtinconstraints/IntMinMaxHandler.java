@@ -242,7 +242,7 @@ public class IntMinMaxHandler implements ConstraintHandler {
                                     scb.append(parameterName)
                                             .append("' at index ")
                                             .appendExpression(v)
-                                            .append(" must be >= ")
+                                            .append(" must be &gt;= ")
                                             .append(min)
                                             .append(" but is ")
                                             .appendExpression(localFieldName + "[" + v + "]");
@@ -259,7 +259,7 @@ public class IntMinMaxHandler implements ConstraintHandler {
                                 .append(parameterName)
                                 .append("' at index ")
                                 .appendExpression(v)
-                                .append(" must be <= ")
+                                .append(" must be &lt;= ")
                                 .append(max)
                                 .append(" but is ")
                                 .appendExpression(localFieldName + "[" + v + "]")

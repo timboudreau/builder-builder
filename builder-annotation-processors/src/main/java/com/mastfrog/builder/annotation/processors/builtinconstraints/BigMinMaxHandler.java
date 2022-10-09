@@ -150,7 +150,7 @@ public final class BigMinMaxHandler implements ConstraintHandler {
 
         @Override
         public void contributeDocComments(Consumer<String> bulletPoints) {
-            bulletPoints.accept("value must be >= " + utils.annotationValue(min, "value", String.class));
+            bulletPoints.accept("value must be &gt;= " + utils.annotationValue(min, "value", String.class));
         }
 
         @Override
@@ -227,7 +227,7 @@ public final class BigMinMaxHandler implements ConstraintHandler {
 
         @Override
         public void contributeDocComments(Consumer<String> bulletPoints) {
-            bulletPoints.accept("value must be <= " + utils.annotationValue(min, "value", String.class));
+            bulletPoints.accept("value must be &lt;= " + utils.annotationValue(min, "value", String.class));
         }
 
         @Override
