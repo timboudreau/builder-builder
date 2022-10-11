@@ -28,6 +28,7 @@ import com.mastfrog.builder.annotation.processors.spi.ConstraintGenerator;
 import static com.mastfrog.builder.annotation.processors.spi.ConstraintGenerator.NULLABLE_ANNOTATION;
 import com.mastfrog.builder.annotation.processors.spi.ConstraintHandler;
 import com.mastfrog.java.vogon.ClassBuilder;
+import com.mastfrog.java.vogon.ClassBuilder.BlockBuilder;
 import java.util.function.Consumer;
 import javax.lang.model.element.AnnotationMirror;
 import javax.lang.model.element.Element;
@@ -72,34 +73,35 @@ public class CollectionAndArraySizeHandler implements ConstraintHandler {
         if (checkedAs != null) {
             checkedAs = utils.erasureOf(checkedAs);
         }
-//        if (utils.isAssignable(type, "java.util.Map")) {
-        if (isAssignable(utils, "java.util.Map", parameterElement)) {
-            if (noNulls) {
-                utils.fail("Cannot null check a map's elements", parameterElement, mir);
-                return;
-            }
-            genConsumer.accept(new CollectionConstraintGenerator(min, max, false, nullable, false, checkedAs));
-//        } else if (utils.isAssignable(type, "java.util.List")) {
-        } else if (isAssignable(utils, "java.util.List", parameterElement)) {
-            genConsumer.accept(new CollectionConstraintGenerator(min, max, noNulls, nullable, true, checkedAs));
-//        } else if (utils.isAssignable(type, "java.util.Collection")) {
-        } else if (isAssignable(utils, "java.util.Collection", parameterElement)) {
-            genConsumer.accept(new CollectionConstraintGenerator(min, max, noNulls, nullable, false, checkedAs));
-//        } else if (utils.isAssignable(type, "java.util.Map")) {
-        } else if (isAssignable(utils, "java.util.Map", parameterElement)) {
-            genConsumer.accept(new CollectionConstraintGenerator(min, max, noNulls, nullable, false, checkedAs));
-        } else if (type.getKind() == TypeKind.ARRAY) {
+        if (type.getKind() == TypeKind.ARRAY) {
             ArrayType at = (ArrayType) type;
             boolean primitive = at.getComponentType().getKind().isPrimitive();
             genConsumer.accept(new ArrayConstraintGenerator(min, max, noNulls, nullable, primitive, checkedAs));
+        } else if (isAssignable(utils, "java.util.Map", parameterElement)) {
+            if (noNulls) {
+//                utils.fail("Cannot null check a map's elements", parameterElement, mir);
+//                return;
+            }
+            genConsumer.accept(new CollectionConstraintGenerator(min, max, false, nullable, false, checkedAs, true));
+        } else if (isAssignable(utils, "java.util.List", parameterElement)) {
+            genConsumer.accept(new CollectionConstraintGenerator(min, max, noNulls, nullable, true, checkedAs, false));
+        } else if (isAssignable(utils, "java.util.Collection", parameterElement)) {
+            genConsumer.accept(new CollectionConstraintGenerator(min, max, noNulls, nullable, false, checkedAs, false));
         } else {
-            utils.fail("Cannot apply collection constraint to a " + type);
+            utils.fail("Cannot apply collection constraint to a " + type
+                    + " for " + parameterElement + " " + parameterElement.getKind()
+                    + " (" + parameterElement.getClass().getSimpleName() + ") "
+                    + " type " + parameterElement.asType() + " erasure "
+                    + utils.erasureOf(type));
         }
     }
 
     private static boolean isAssignable(AnnotationUtils utils, String typeName, VariableElement param) {
         // Hacky but will do for now
         TypeElement el = utils.processingEnv().getElementUtils().getTypeElement(typeName);
+        if (utils.erasureOf(el.asType()).toString().equals(typeName)) {
+            return true;
+        }
 
         boolean assig1 = utils.processingEnv().getTypeUtils().isAssignable(el.asType(), param.asType());
         boolean assig2 = utils.processingEnv().getTypeUtils().isAssignable(param.asType(), el.asType());
@@ -302,9 +304,12 @@ public class CollectionAndArraySizeHandler implements ConstraintHandler {
 
     private static final class CollectionConstraintGenerator extends AbstractGenerator {
 
+        private final boolean isMap;
+
         public CollectionConstraintGenerator(int min, int max, boolean noNullElements,
-                boolean nullableValue, boolean isList, TypeMirror checkedAs) {
+                boolean nullableValue, boolean isList, TypeMirror checkedAs, boolean isMap) {
             super(min, max, noNullElements, nullableValue, isList, checkedAs);
+            this.isMap = isMap;
         }
 
         @Override
@@ -392,7 +397,7 @@ public class CollectionAndArraySizeHandler implements ConstraintHandler {
                                 .endIf()
                                 .endBlock();
                     });
-                } else {
+                } else if (!isMap) {
                     String vn = "_" + fieldVariableName + "Item";
                     bb.simpleLoop("Object", vn, loop -> loop.over(fieldVariableName, bk -> {
                         bk.ifNull(vn).invoke(addMethodName)
@@ -403,6 +408,35 @@ public class CollectionAndArraySizeHandler implements ConstraintHandler {
                                 .statement("break")
                                 .endIf();
                     }));
+                } else if (isMap) {
+                    String vn = "entry";
+                    bb.simpleLoop("Map.Entry<?,?>", vn, loop
+                            -> {
+                        BlockBuilder<?> lbb = loop.overInvocationOf("entrySet")
+                                .on(fieldVariableName);
+                        lbb.declare("key").initializedByInvoking("getKey")
+                                .on(vn).as("Object");
+                        lbb.ifNull("key")
+                                .invoke(addMethodName)
+                                .withStringConcatentationArgument(parameterName)
+                                .append("contains null keys.")
+                                .endConcatenation()
+                                .on(problemsListVariableName)
+                                .statement("break")
+                                .endIf();
+                        lbb.declare("value").initializedByInvoking("getValue")
+                                .on(vn).as("Object");
+                        lbb.ifNull("value")
+                                .invoke(addMethodName)
+                                .withStringConcatentationArgument(parameterName)
+                                .append("contains null values.")
+                                .endConcatenation()
+                                .on(problemsListVariableName)
+                                .statement("break")
+                                .endIf();
+                        lbb.endBlock();
+                    }
+                    );
                 }
             }
         }

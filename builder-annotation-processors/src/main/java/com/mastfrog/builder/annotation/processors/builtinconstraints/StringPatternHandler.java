@@ -29,6 +29,8 @@ import static com.mastfrog.builder.annotation.processors.spi.ConstraintGenerator
 import com.mastfrog.builder.annotation.processors.spi.ConstraintHandler;
 import com.mastfrog.java.vogon.ClassBuilder;
 import com.mastfrog.util.service.ServiceProvider;
+import com.mastfrog.util.strings.Escaper;
+import com.mastfrog.util.strings.Strings;
 import java.util.function.Consumer;
 import java.util.regex.Pattern;
 import javax.lang.model.element.AnnotationMirror;
@@ -72,7 +74,6 @@ public class StringPatternHandler implements ConstraintHandler {
             if (pat != null && !".*".equals(pat) && !pat.isEmpty()) {
                 Pattern p = null;
                 try {
-                    System.out.println("COMPILE PATTERN '" + pat + "'");
                     p = Pattern.compile(pat);
                 } catch (Exception | Error e) {
                     utils.fail("Invalid regular expression '" + pat + "'", ve, mir);
@@ -139,7 +140,8 @@ public class StringPatternHandler implements ConstraintHandler {
         @Override
         public void contributeDocComments(Consumer<String> bulletPoints) {
             if (pattern != null) {
-                bulletPoints.accept("Must match the pattern <code>/" + pattern.pattern() + "/</code>");
+                String htmlized = Strings.escape(pattern.pattern(), Escaper.BASIC_HTML);
+                bulletPoints.accept("Must match the pattern <code>" + htmlized + "</code>");
             }
             if (minLength != 0) {
                 bulletPoints.accept("Must be &gt;= " + minLength + " in length.");

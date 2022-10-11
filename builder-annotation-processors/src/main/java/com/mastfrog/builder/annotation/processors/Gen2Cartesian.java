@@ -166,7 +166,7 @@ public class Gen2Cartesian {
                     .withModifier(PUBLIC, FINAL)
                     .autoToString();
             if (!isRoot()) {
-                cb.docComment("Intermediate builder for a <code>"
+                result.docComment("Intermediate builder for a <code>"
                         + desc.targetTypeName + "</code> obtained from a "
                         + "setter method on another builder.");
             }
