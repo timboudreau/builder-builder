@@ -450,8 +450,7 @@ final class BuilderDescriptors {
             <V> void applyParam(String localFieldName, IsSetTestGenerator test, ArgumentConsumer<V> ib, ClassBuilder<?> cb) {
                 defaulter.ifPresentOrElse(def -> {
                     def.generate(localFieldName, test, ib.withArgument(), cb);
-                },
-                        () -> ib.withArgument(localFieldName));
+                }, () -> ib.withArgument(localFieldName));
             }
 
             public String get() {

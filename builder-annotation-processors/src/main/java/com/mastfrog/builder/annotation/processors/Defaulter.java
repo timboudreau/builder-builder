@@ -26,6 +26,7 @@ package com.mastfrog.builder.annotation.processors;
 import com.mastfrog.annotation.AnnotationUtils;
 import com.mastfrog.builder.annotation.processors.spi.IsSetTestGenerator;
 import com.mastfrog.java.vogon.ClassBuilder;
+import com.mastfrog.java.vogon.ClassBuilder.Value;
 import com.mastfrog.java.vogon.ClassBuilder.ValueExpressionBuilder;
 import com.mastfrog.util.strings.Escaper;
 import com.mastfrog.util.strings.Strings;
@@ -719,7 +720,21 @@ public abstract class Defaulter {
 
         @Override
         public <X> X generate(String localName, IsSetTestGenerator test, ValueExpressionBuilder<X> veb, ClassBuilder<?> target) {
-            return test.isSetTest(veb.ternary()).expression(localName).toNewInstance().withArgument(ClassBuilder.number(num)).ofType(ofType.getQualifiedName().toString());
+            switch (ofType.asType().toString()) {
+                case "java.math.BigInteger":
+                    return test.isSetTest(veb.ternary()).expression(localName)
+                            .invoke("valueOf")
+                            .withArgument(num.longValue())
+                            .on("BigInteger");
+                case "java.math.BigDecimal":
+                    return test.isSetTest(veb.ternary()).expression(localName)
+                            .invoke("valueOf")
+                            .withArgument(num.doubleValue())
+                            .on("BigDecimal");
+            }
+            return test.isSetTest(veb.ternary()).expression(localName).toNewInstance().withArgument(
+                    ClassBuilder.number(num)
+            ).ofType(ofType.getQualifiedName().toString());
         }
     }
 

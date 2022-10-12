@@ -116,8 +116,6 @@ public class BuildMethodFactory<C> {
                         bb.returningInvocationOf(desc.origin.getSimpleName().toString(), ib -> {
                             for (FieldDescriptor fd : desc.paramForVar.values()) {
                                 LocalFieldGenerator loc = fields.apply(fd);
-
-//                                ib.withArgument(loc.localFieldName());
                                 fd.applyParam(loc.localFieldName(), checkers.generatorFor(fd), ib, bldr);
                             }
                             ib.on(against);
@@ -127,7 +125,6 @@ public class BuildMethodFactory<C> {
                             for (FieldDescriptor fd : desc.paramForVar.values()) {
                                 LocalFieldGenerator loc = fields.apply(fd);
                                 fd.applyParam(loc.localFieldName(), checkers.generatorFor(fd), nb, bldr);
-//                                nb.withArgument(loc.localFieldName());
                             }
                             nb.ofType(desc.targetTypeName + (generics.isEmpty() ? "" : "<>"));
                         });
