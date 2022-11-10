@@ -12,7 +12,7 @@
 
     <groupId>com.mastfrog.builder</groupId>
     <artifactId>builder-builder-parent</artifactId>
-    <version>1.0.7</version>
+    <version>1.0.8</version>
 
     <packaging>pom</packaging>
 
