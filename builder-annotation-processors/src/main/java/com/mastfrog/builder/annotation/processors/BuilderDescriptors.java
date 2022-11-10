@@ -487,32 +487,32 @@ final class BuilderDescriptors {
 
             boolean isByte() {
                 TypeMirror tm = var.asType();
-                return var.asType().getKind() == TypeKind.BYTE || "java.lang.Byte".equals(tm);
+                return var.asType().getKind() == TypeKind.BYTE || "java.lang.Byte".equals(tm.toString());
             }
 
             boolean isShort() {
                 TypeMirror tm = var.asType();
-                return var.asType().getKind() == TypeKind.SHORT || "java.lang.Short".equals(tm);
+                return var.asType().getKind() == TypeKind.SHORT || "java.lang.Short".equals(tm.toString());
             }
 
             boolean isFloat() {
                 TypeMirror tm = var.asType();
-                return var.asType().getKind() == TypeKind.FLOAT || "java.lang.Float".equals(tm);
+                return var.asType().getKind() == TypeKind.FLOAT || "java.lang.Float".equals(tm.toString());
             }
 
             boolean isDouble() {
                 TypeMirror tm = var.asType();
-                return var.asType().getKind() == TypeKind.DOUBLE || "java.lang.Double".equals(tm);
+                return var.asType().getKind() == TypeKind.DOUBLE || "java.lang.Double".equals(tm.toString());
             }
 
             boolean isInt() {
                 TypeMirror tm = var.asType();
-                return var.asType().getKind() == TypeKind.INT || "java.lang.Integer".equals(tm);
+                return var.asType().getKind() == TypeKind.INT || "java.lang.Integer".equals(tm.toString());
             }
 
             boolean isLong() {
                 TypeMirror tm = var.asType();
-                return var.asType().getKind() == TypeKind.LONG || "java.lang.Long".equals(tm);
+                return var.asType().getKind() == TypeKind.LONG || "java.lang.Long".equals(tm.toString());
             }
 
             String minValue() {
