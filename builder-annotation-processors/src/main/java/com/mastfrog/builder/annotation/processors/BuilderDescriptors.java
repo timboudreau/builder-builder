@@ -158,7 +158,20 @@ final class BuilderDescriptors {
 
     static <B extends ClassBuilder<C>, C> B addGeneratedAnnotation(B cb) {
         cb.importing(Generated.class);
-        cb.annotatedWith(Generated.class.getSimpleName(), ab -> ab.addArgument("value", BuilderAnnotationProcessor.class.getName()));
+
+        Generated g;
+
+        cb.annotatedWith(Generated.class.getSimpleName(), ab -> {
+            ab.addArrayArgument("value", arr -> {
+                arr.literal(Version.GROUP_ID)
+                        .literal(Version.ARTIFACT_ID)
+                        .literal(Version.VERSION)
+                        .literal(Version.COMMIT_DATE)
+                        .literal(Version.REPO_STATUS)
+                        .literal(Version.SHORT_COMMIT_HASH);
+            });
+            ab.addArgument("value", BuilderAnnotationProcessor.class.getName());
+        });
         return cb;
     }
 

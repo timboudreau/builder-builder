@@ -27,5 +27,18 @@
             <artifactId>annotation-processors</artifactId>
         </dependency>
     </dependencies>
+    
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>com.mastfrog</groupId>
+                <artifactId>revision-info-plugin</artifactId>
+                <configuration>
+                    <genSourcesDir>${basedir}/src/main/java</genSourcesDir>
+                    <genClass>com.mastfrog.builder.annotation.processors.Version</genClass>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
 
 </project>
