@@ -26,11 +26,12 @@ package com.mastfrog.builder.annotation.processors;
 import com.mastfrog.annotation.AnnotationUtils;
 import static com.mastfrog.annotation.AnnotationUtils.capitalize;
 import static com.mastfrog.annotation.AnnotationUtils.simpleName;
+import static com.mastfrog.builder.annotation.processors.BuilderAnnotationProcessor.OPTIONALLY;
+import static com.mastfrog.builder.annotation.processors.Version.*;
 import com.mastfrog.builder.annotation.processors.spi.ConstraintGenerator;
 import com.mastfrog.builder.annotation.processors.spi.IsSetTestGenerator;
 import com.mastfrog.java.vogon.ArgumentConsumer;
 import com.mastfrog.java.vogon.ClassBuilder;
-
 import java.io.IOException;
 import java.io.OutputStream;
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -38,6 +39,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -51,6 +53,7 @@ import javax.annotation.processing.FilerException;
 import javax.annotation.processing.Generated;
 import javax.lang.model.element.AnnotationMirror;
 import javax.lang.model.element.Element;
+import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
@@ -58,9 +61,6 @@ import javax.lang.model.type.ArrayType;
 import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
 import javax.tools.JavaFileObject;
-import static com.mastfrog.builder.annotation.processors.BuilderAnnotationProcessor.OPTIONALLY;
-import java.util.HashSet;
-import javax.lang.model.element.ElementKind;
 
 /**
  *
@@ -163,12 +163,15 @@ final class BuilderDescriptors {
 
         cb.annotatedWith(Generated.class.getSimpleName(), ab -> {
             ab.addArrayArgument("value", arr -> {
-                arr.literal(Version.GROUP_ID)
-                        .literal(Version.ARTIFACT_ID)
-                        .literal(Version.VERSION)
-                        .literal(Version.COMMIT_DATE)
-                        .literal(Version.REPO_STATUS)
-                        .literal(Version.SHORT_COMMIT_HASH);
+                arr.literal(GROUP_ID)
+                        .literal(ARTIFACT_ID)
+                        .literal(VERSION)
+                        .literal(COMMIT_DATE)
+                        .literal(REPO_STATUS)
+                        .literal(SHORT_COMMIT_HASH)
+                        .literal("JDK " + BUILD_JDK)
+                        .literal(BUILD_OS)
+                        .literal(BUILD_OS_ARCH);
             });
         });
         return cb;

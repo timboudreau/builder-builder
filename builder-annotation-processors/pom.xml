@@ -33,9 +33,12 @@
             <plugin>
                 <groupId>com.mastfrog</groupId>
                 <artifactId>revision-info-plugin</artifactId>
+                <version>0.22</version>
                 <configuration>
                     <genSourcesDir>${basedir}/src/main/java</genSourcesDir>
                     <genClass>com.mastfrog.builder.annotation.processors.Version</genClass>
+                    <packagePrivate>true</packagePrivate>
+                    <includeSystemInfo>true</includeSystemInfo>
                 </configuration>
             </plugin>
         </plugins>
