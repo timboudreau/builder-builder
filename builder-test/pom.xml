@@ -6,12 +6,17 @@
     <parent>
         <groupId>com.mastfrog.builder</groupId>
         <artifactId>builder-builder-parent</artifactId>
-        <version>1.0.7</version>
+        <version>1.0.8</version>
     </parent>
 
-    <groupId>com.mastfrog.builder.test</groupId>
+    <groupId>com.mastfrog.builder</groupId>
     <artifactId>builder-test</artifactId>
     <name>builder-builder-tests</name>
+
+    <!-- No need to publish this to maven central - it is just some tests -->
+    <properties>
+        <skipNexusStagingDeployMojo>true</skipNexusStagingDeployMojo>
+    </properties>
 
     <dependencies>
 

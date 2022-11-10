@@ -11,6 +11,11 @@
     <artifactId>builder-builder-demo</artifactId>
     <name>builder-builder-demo</name>
 
+    <!-- No need to publish this to maven central - it is just a demo -->
+    <properties>
+        <skipNexusStagingDeployMojo>true</skipNexusStagingDeployMojo>
+    </properties>
+
     <dependencies>
 
         <!--

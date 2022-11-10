@@ -170,7 +170,6 @@ final class BuilderDescriptors {
                         .literal(Version.REPO_STATUS)
                         .literal(Version.SHORT_COMMIT_HASH);
             });
-            ab.addArgument("value", BuilderAnnotationProcessor.class.getName());
         });
         return cb;
     }
