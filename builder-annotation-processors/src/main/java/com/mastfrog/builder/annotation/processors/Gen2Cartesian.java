@@ -27,6 +27,7 @@ import static com.mastfrog.annotation.AnnotationUtils.capitalize;
 import com.mastfrog.builder.annotation.processors.BuilderDescriptors.BuilderDescriptor;
 import com.mastfrog.builder.annotation.processors.BuilderDescriptors.BuilderDescriptor.FieldDescriptor;
 import static com.mastfrog.builder.annotation.processors.BuilderDescriptors.initDebug;
+import static com.mastfrog.builder.annotation.processors.BuilderStyles.DEBUG;
 import static com.mastfrog.builder.annotation.processors.Utils.combine;
 import static com.mastfrog.builder.annotation.processors.Utils.including;
 import static com.mastfrog.builder.annotation.processors.Utils.omitting;
@@ -35,6 +36,7 @@ import com.mastfrog.java.vogon.ClassBuilder;
 import com.mastfrog.java.vogon.ClassBuilder.InvocationBuilder;
 import com.mastfrog.java.vogon.ClassBuilder.InvocationBuilderBase;
 import com.mastfrog.java.vogon.ClassBuilder.NewBuilder;
+import static com.mastfrog.java.vogon.ClassBuilder.variable;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -70,6 +72,11 @@ public class Gen2Cartesian {
                 .withModifier(PUBLIC, FINAL)
                 .docComment("Builder for a " + desc.targetTypeName + ".")
                 .autoToString());
+
+        if (desc.styles.contains(DEBUG)) {
+            cb.generateDebugLogCode();
+        }
+
         initTree();
         List<OneBuilderModel> models = new ArrayList<>(this.models.values());
         Collections.sort(models, (a, b) -> {
@@ -263,6 +270,49 @@ public class Gen2Cartesian {
                         });
                     });
 
+                    if (fd.isNumericTypeRequiringCast()) {
+                        result.method(withMethodName, mb -> {
+                            String convenienceType = fd.convenienceParameterTypeName();
+                            mb.addArgument(convenienceType, "value");
+
+                            mb.returning(next.nameWithImplicitGenerics());
+                            mb.withModifier(PUBLIC);
+                            mb.docComment("Convenience setter which takes a <code>" + convenienceType
+                                    + "</code> to eliminate the need for casts. Arguments are checked "
+                                    + " against <code>" + fd.minValue() + "</code> / <code>"
+                                    + fd.maxValue() + "</code>\n"
+                                    + fd.setterJavadoc());
+                            mb.withTypeParams(addedGenerics(next));
+
+                            mb.body(bb -> {
+                                ClassBuilder.Variable fv = variable("value");
+                                ClassBuilder.IfBuilder<?> test = bb.iff(fv.isLessThan(fd.minValue()).logicalOrWith(fv.isGreaterThan(fd.maxValue())));
+                                test.andThrow(nb -> {
+                                    nb.withStringConcatentationArgument("value")
+                                            .append(" must be greater than or equal to ")
+                                            .appendExpression(fd.minValue())
+                                            .append(" (").append(fd.minValue())
+                                            .append(") and less than or equal to ")
+                                            .appendExpression(fd.maxValue())
+                                            .append(" (").append(fd.maxValue()).append(") but got ")
+                                            .appendExpression("value")
+                                            .endConcatenation()
+                                            .ofType("IllegalArgumentException");
+                                }).endIf();
+
+                                bb.declare(fd.fieldName)
+                                        .initializedWithCastTo(fd.unboxedNumberTypeName())
+                                        .ofExpression("value")
+                                        .as(fd.unboxedNumberTypeName());
+
+                                bb.returningNew(nb -> {
+                                    next.applyArgs(result, ucf, nb, lff, fd, vmf);
+                                    nb.ofType(next.nameWithImplicitGenerics());
+                                });
+                            });
+                        });
+                    }
+
                     generateBuilderWithMethod(desc, fd, result, withMethodName, next);
                 }
             } else if (unusedFields.size() == 1) {
@@ -320,6 +370,88 @@ public class Gen2Cartesian {
                         });
                     });
                 });
+
+                if (last.isNumericTypeRequiringCast()) {
+                    result.method(buildWithMethod, mb -> {
+                        String convenienceType = last.convenienceParameterTypeName();
+                        mb.addArgument(convenienceType, "value");
+
+                        mb.returning(typeToBuild + retGenerics);
+                        mb.withModifier(PUBLIC);
+
+                        mb.returning(typeToBuild + retGenerics);
+                        if (last.canBeVarargs()) {
+                            mb.withModifier(FINAL)
+                                    .annotatedWith("SafeVarargs").closeAnnotation();
+                        }
+                        for (String mg : methodGens) {
+                            if (!this.implicitGenerics.contains(mg)) {
+                                mb.withTypeParam(desc.generics.nameWithBound(mg));
+                            }
+                        }
+                        desc.thrownTypes().forEach(thrown -> {
+                            if (thrown.getKind() != TypeKind.DECLARED) {
+                                desc.utils().fail("Cannot handle generified thrown types", desc.origin);
+                            }
+                            mb.throwing(thrown.toString());
+                        });
+
+                        mb.docComment("Convenience build method which takes a <code>" + convenienceType
+                                + "</code> to eliminate the need for casts. Arguments are checked "
+                                + " against <code>" + last.minValue() + "</code> / <code>"
+                                + last.maxValue() + "</code>\n"
+                                + last.setterJavadoc());
+
+                        mb.body(bb -> {
+                            ClassBuilder.Variable fv = variable("value");
+                            ClassBuilder.IfBuilder<?> test = bb
+                                    .iff(fv.isLessThan(last.minValue())
+                                            .logicalOrWith(fv.isGreaterThan(last.maxValue())));
+                            test.andThrow(nb -> {
+                                nb.withStringConcatentationArgument("value")
+                                        .append(" must be greater than or equal to ")
+                                        .appendExpression(last.minValue())
+                                        .append(" (").append(last.minValue())
+                                        .append(") and less than or equal to ")
+                                        .appendExpression(last.maxValue())
+                                        .append(" (").append(last.maxValue()).append(") but got ")
+                                        .appendExpression("value")
+                                        .endConcatenation()
+                                        .ofType("IllegalArgumentException");
+                            }).endIf();
+
+                            bb.declare(last.fieldName)
+                                    .initializedWithCastTo(last.unboxedNumberTypeName())
+                                    .ofExpression("value")
+                                    .as(last.unboxedNumberTypeName());
+
+                            bb.lineComment("b. TargetType " + desc.targetTypeName);
+                            bb.lineComment("b. TargetFqn " + desc.targetFqn());
+                            bb.lineComment("b. fullTargetGenerics " + desc.fullTargetGenerics());
+                            bb.lineComment("b. fullTargetGenericSignature " + desc.fullTargetGenericSignature());
+
+                            generateNullCheck(last, bb);
+                            Set<FieldDescriptor> optionals = desc.optionalFields();
+                            bb.returningNew(nb -> {
+                                for (FieldDescriptor fd : desc.fields()) {
+                                    Optional<Defaulter> def = fd.defaulter;
+                                    if (fd != last) {
+                                        if (def.isPresent()) {
+                                            def.get().generate(lff.generatorFor(fd).localFieldName(), ucf.generatorFor(fd), nb.withArgument(), result);
+                                        } else {
+                                            nb.withArgument(lff.generatorFor(fd).localFieldName());
+                                        }
+                                    } else {
+                                        generateInlineConstraintsTest(result, ucf, nb, fd, def, vmf);
+                                    }
+                                }
+
+                                nb.ofType(desc.targetTypeName + (hasGenerics ? "<>" : ""));
+                            });
+
+                        });
+                    });
+                }
                 generateBuilderWithMethod(desc, last, result, buildWithMethod, typeToBuild + retGenerics);
             }
             result.build();

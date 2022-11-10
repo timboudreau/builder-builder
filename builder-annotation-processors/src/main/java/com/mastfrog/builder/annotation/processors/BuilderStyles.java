@@ -34,10 +34,27 @@ import javax.lang.model.element.AnnotationMirror;
  * @author Tim Boudreau
  */
 enum BuilderStyles {
+    /**
+     * The (badly named) default.
+     */
     CLOSURES,
+    /**
+     * If set, generate "flat" builders which have a build method that throws,
+     * rather than using nested types that only return a builder that <i>has</i>
+     * a build method when all required parameters have been set (requires more
+     * builder classes, but turns incompletely initialiazed objects from a
+     * runtime error to a compile-type error, which is always a good thing).
+     */
     FLAT,
+    /**
+     * If set, generated builders should be package private.
+     */
     PACKAGE_PRIVATE,
-    ;
+    /**
+     * If set, debug comments showing the source line that generated some code
+     * will be generated.
+     */
+    DEBUG;
 
     static Set<BuilderStyles> styles(AnnotationUtils utils, AnnotationMirror in) {
         // Don't fail the way valueOf() does
@@ -47,12 +64,31 @@ enum BuilderStyles {
         if (all != null) {
             for (String s : all) {
                 for (BuilderStyles bs : possible) {
-                    if (bs.name().equals(s)) {
+                    if (bs.matches(s)) {
                         result.add(bs);
                     }
                 }
             }
         }
         return result;
+    }
+
+    boolean matches(String what) {
+        if (what == null) {
+            return false;
+        }
+        if (name().equals(what)) {
+            return true;
+        } else if (name().toLowerCase().equals(what.toLowerCase())) {
+            return true;
+        } else if (toString().toLowerCase().equals(what.toLowerCase())) {
+            return true;
+        }
+        return false;
+    }
+
+    @Override
+    public String toString() {
+        return name().toLowerCase().replace('_', '-');
     }
 }

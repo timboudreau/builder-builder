@@ -51,6 +51,10 @@ public class Gen2 {
                 .withModifier(Modifier.PUBLIC, Modifier.FINAL)
                 .autoToString());
 
+        if (styles.contains(BuilderStyles.DEBUG)) {
+            cb.generateDebugLogCode();
+        }
+
         desc.genericsRequiredFor(desc.fields()).forEach(tp -> {
             String qual = desc.generics.nameWithBound(tp);
             cb.withTypeParameters(qual);

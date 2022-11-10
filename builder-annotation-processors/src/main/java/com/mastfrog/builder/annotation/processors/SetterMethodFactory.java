@@ -30,6 +30,7 @@ import static com.mastfrog.builder.annotation.processors.Gen2Cartesian.generateB
 import com.mastfrog.builder.annotation.processors.UnsetCheckerFactory.UnsetCheckGenerator;
 import com.mastfrog.builder.annotation.processors.spi.ConstraintGenerator;
 import com.mastfrog.java.vogon.ClassBuilder;
+import static com.mastfrog.java.vogon.ClassBuilder.variable;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -202,6 +203,48 @@ public class SetterMethodFactory<C> {
                             bb.returningThis();
                         });
             });
+            if (field.isNumericTypeRequiringCast()) {
+                bldr.method(withMethodName, mb -> {
+                    String convenienceType = field.convenienceParameterTypeName();
+                    mb.addArgument(convenienceType, "value");
+                    mb.withModifier(Modifier.PUBLIC)
+                            .docComment("Convenience setter which takes a <code>" + convenienceType
+                                    + "</code> to eliminate the need for casts. Arguments are checked "
+                                    + " against <code>" + field.minValue() + "</code> / <code>"
+                                    + field.maxValue() + "</code>\n" + field.setterJavadoc())
+                            .returning(bldr.parameterizedClassName(false))
+                            .body(bb -> {
+                                ClassBuilder.Variable fv = variable("value");
+                                ClassBuilder.IfBuilder<?> test = bb.iff(fv.isLessThan(field.minValue()).logicalOrWith(fv.isGreaterThan(field.maxValue())));
+                                test.andThrow(nb -> {
+                                    nb.withStringConcatentationArgument("value")
+                                            .append(" must be greater than or equal to ")
+                                            .appendExpression(field.minValue())
+                                            .append(" (").append(field.minValue())
+                                            .append(") and less than or equal to ")
+                                            .appendExpression(field.maxValue())
+                                            .append(" (").append(field.maxValue()).append(") but got ")
+                                            .appendExpression("value")
+                                            .endConcatenation()
+                                            .ofType("IllegalArgumentException");
+                                }).endIf();
+
+                                bb.declare(field.fieldName)
+                                        .initializedWithCastTo(field.unboxedNumberTypeName())
+                                        .ofExpression("value")
+                                        .as(field.unboxedNumberTypeName());
+
+                                String builderField = fields.apply(field).localFieldName();
+
+                                validations.generator(field).assign(field.fieldName, bb.assign("this." + builderField)
+                                        .to());
+                                checkers.apply(field).onSet(bb);
+
+                                bb.returningThis();
+                            });
+                });
+
+            }
 
             generateBuilderWithMethod(desc, field, bldr, withMethodName,
                     bldr.parameterizedClassName(false));

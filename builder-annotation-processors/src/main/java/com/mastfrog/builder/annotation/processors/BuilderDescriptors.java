@@ -123,7 +123,7 @@ final class BuilderDescriptors {
 //            ClassBuilder<String> cb = new Gen2(e.getValue(), e.getValue().styles).generate();
                 try {
                     JavaFileObject src = filer.createSourceFile(cb.fqn(), e.getValue().elements());
-                    try ( OutputStream out = src.openOutputStream()) {
+                    try (OutputStream out = src.openOutputStream()) {
                         out.write(cb.toString().getBytes(UTF_8));
                     }
                     toRemove.add(e.getKey());
@@ -471,6 +471,94 @@ final class BuilderDescriptors {
                     return at.getComponentType() + "...";
                 }
                 return typeName();
+            }
+
+            boolean isByte() {
+                TypeMirror tm = var.asType();
+                return var.asType().getKind() == TypeKind.BYTE || "java.lang.Byte".equals(tm);
+            }
+
+            boolean isShort() {
+                TypeMirror tm = var.asType();
+                return var.asType().getKind() == TypeKind.SHORT || "java.lang.Short".equals(tm);
+            }
+
+            boolean isFloat() {
+                TypeMirror tm = var.asType();
+                return var.asType().getKind() == TypeKind.FLOAT || "java.lang.Float".equals(tm);
+            }
+
+            boolean isDouble() {
+                TypeMirror tm = var.asType();
+                return var.asType().getKind() == TypeKind.DOUBLE || "java.lang.Double".equals(tm);
+            }
+
+            boolean isInt() {
+                TypeMirror tm = var.asType();
+                return var.asType().getKind() == TypeKind.INT || "java.lang.Integer".equals(tm);
+            }
+
+            boolean isLong() {
+                TypeMirror tm = var.asType();
+                return var.asType().getKind() == TypeKind.LONG || "java.lang.Long".equals(tm);
+            }
+
+            String minValue() {
+                return minMax(false);
+            }
+
+            String maxValue() {
+                return minMax(true);
+            }
+
+            private String minMax(boolean max) {
+                String suffix = max ? ".MAX_VALUE" : ".MIN_VALUE";
+                String head = boxedNumberTypeName();
+                if (head == null) {
+                    return null;
+                }
+                return head + suffix;
+            }
+
+            String unboxedNumberTypeName() {
+                if (isInt()) {
+                    return "int";
+                }
+                return boxedNumberTypeName().toLowerCase();
+            }
+
+            String boxedNumberTypeName() {
+                String head;
+                if (isByte()) {
+                    head = "Byte";
+                } else if (isShort()) {
+                    head = "Short";
+                } else if (isInt()) {
+                    head = "Integer";
+                } else if (isLong()) {
+                    head = "Long";
+                } else if (isFloat()) {
+                    head = "Float";
+                } else if (isDouble()) {
+                    head = "Double";
+                } else {
+                    return null;
+                }
+                return head;
+            }
+
+            boolean isNumericTypeRequiringCast() {
+                return isShort() || isByte() || isFloat();
+            }
+
+            String convenienceParameterTypeName() {
+                if (isShort() || isByte()) {
+                    return "int";
+                }
+                if (isFloat()) {
+                    return "double";
+                }
+                return null;
             }
 
             String typeName() {
