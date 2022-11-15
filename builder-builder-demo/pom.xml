@@ -13,7 +13,9 @@
 
     <!-- No need to publish this to maven central - it is just a demo -->
     <properties>
-        <skipNexusStagingDeployMojo>true</skipNexusStagingDeployMojo>
+<!-- Sigh - this is the last repository built, so if we do not publish it, nothing
+     gets published. -->
+<!--        <skipNexusStagingDeployMojo>true</skipNexusStagingDeployMojo> -->
     </properties>
 
     <dependencies>

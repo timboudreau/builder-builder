@@ -28,4 +28,4 @@
 set -e
 mvn clean
 export MAVEN_OPTS="--add-opens=java.base/java.util=ALL-UNNAMED --add-opens=java.base/java.lang.reflect=ALL-UNNAMED --add-opens=java.base/java.text=ALL-UNNAMED --add-opens=java.desktop/java.awt.font=ALL-UNNAMED"
-mvn -Dmaven.test.skip.exec=true --activate-profiles release clean install javadoc:jar source:jar gpg:sign nexus-staging:deploy
+mvn -DautoReleaseAfterClose=true -Dmaven.test.skip.exec=true --activate-profiles release clean install javadoc:jar source:jar gpg:sign nexus-staging:deploy
